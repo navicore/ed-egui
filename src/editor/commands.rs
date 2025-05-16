@@ -3,7 +3,7 @@
 pub enum CursorMovement {
     Left,
     Right,
-    Up, 
+    Up,
     Down,
     WordLeft,
     WordRight,
@@ -31,7 +31,7 @@ pub enum EditorCommand {
     Cut,
     Paste,
     NewLine,
-    
+
     // Custom commands
     Custom(String),
 

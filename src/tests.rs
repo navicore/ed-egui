@@ -60,7 +60,7 @@ mod buffer_tests {
         // Current implementation sets cursor to line start
         let line_after = buffer.current_line();
         let column_after = buffer.current_column();
-        
+
         // Verify we're still on the same line
         assert_eq!(line_before, line_after);
         // Column could be 0 or 1 depending on implementation, but it should be near the start
@@ -70,44 +70,44 @@ mod buffer_tests {
         buffer.move_to_line_end();
         assert_eq!(buffer.cursor_position(), 7);
     }
-    
+
     #[test]
     fn test_line_calculations() {
         let mut buffer = TextBuffer::new();
         buffer.set_text("abc\ndef\nghi".to_string());
-        
+
         assert_eq!(buffer.line_count(), 3);
-        
+
         buffer.set_cursor_position(0);
         assert_eq!(buffer.current_line(), 0);
         assert_eq!(buffer.current_column(), 0);
-        
+
         buffer.set_cursor_position(5); // Middle of second line
         assert_eq!(buffer.current_line(), 1);
         assert_eq!(buffer.current_column(), 1);
-        
+
         buffer.set_cursor_position(8); // Middle of third line
         assert_eq!(buffer.current_line(), 2);
         assert_eq!(buffer.current_column(), 0);
     }
-    
+
     #[test]
     fn test_vertical_movement() {
         let mut buffer = TextBuffer::new();
         buffer.set_text("abc\ndefg\nhi".to_string());
-        
+
         buffer.set_cursor_position(5); // Middle of second line
         assert_eq!(buffer.cursor_position(), 5);
-        
+
         buffer.move_cursor_up();
         assert_eq!(buffer.cursor_position(), 1); // Same column in first line
-        
+
         buffer.set_cursor_position(5);
         buffer.move_cursor_down();
         // We don't know the exact position since it depends on the implementation
         // but we should be in the third line
         assert_eq!(buffer.current_line(), 2);
-        
+
         // Test column preservation
         buffer.set_cursor_position(6); // Towards end of second line
         buffer.move_cursor_down();
@@ -115,35 +115,35 @@ mod buffer_tests {
         assert_eq!(buffer.current_line(), 2);
         assert!(buffer.cursor_position() >= 9); // Should be at least past beginning of line 3
     }
-    
+
     #[test]
     fn test_word_movement() {
         let mut buffer = TextBuffer::new();
         buffer.set_text("abc def ghi".to_string());
-        
+
         buffer.set_cursor_position(0);
         buffer.move_cursor_word_right();
         assert_eq!(buffer.cursor_position(), 4);
-        
+
         buffer.move_cursor_word_right();
         assert_eq!(buffer.cursor_position(), 8);
-        
+
         buffer.move_cursor_word_left();
         assert_eq!(buffer.cursor_position(), 4);
-        
+
         buffer.move_cursor_word_left();
         assert_eq!(buffer.cursor_position(), 0);
     }
-    
+
     #[test]
     fn test_document_movement() {
         let mut buffer = TextBuffer::new();
         buffer.set_text("abc\ndef\nghi".to_string());
-        
+
         buffer.set_cursor_position(5);
         buffer.move_cursor_document_start();
         assert_eq!(buffer.cursor_position(), 0);
-        
+
         buffer.move_cursor_document_end();
         assert_eq!(buffer.cursor_position(), 11);
     }
