@@ -1,0 +1,7 @@
+/target
+**/*.rs.bk
+Cargo.lock
+**/.DS_Store
+/src/egui
+/src/egui_code_editor
+/reference
