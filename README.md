@@ -1,6 +1,14 @@
+[![Rust CI](https://github.com/navicore/ed-egui/actions/workflows/rust-ci.yml/badge.svg)](https://github.com/navicore/ed-egui/actions/workflows/rust-ci.yml)
+
 # Ed-Egui
 
 A flexible code editor widget for egui with Vim and Emacs key bindings.
+
+# UNDER CONSTRUCTION
+
+# UNDER CONSTRUCTION
+
+# UNDER CONSTRUCTION
 
 ## Features
 
