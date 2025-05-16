@@ -1,3 +1,18 @@
+/// Types of cursor movement supported by the editor
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CursorMovement {
+    Left,
+    Right,
+    Up, 
+    Down,
+    WordLeft,
+    WordRight,
+    LineStart,
+    LineEnd,
+    DocumentStart,
+    DocumentEnd,
+}
+
 /// Represents commands that can be executed on the text buffer
 #[derive(Debug, Clone)]
 pub enum EditorCommand {
@@ -7,15 +22,18 @@ pub enum EditorCommand {
     DeleteCharForward,
 
     // Cursor movement
-    MoveCursorLeft,
-    MoveCursorRight,
-    MoveCursorUp,
-    MoveCursorDown,
-    MoveToLineStart,
-    MoveToLineEnd,
+    MoveCursor(CursorMovement),
 
-    // Line operations
+    // Text operations
+    DeleteLine,
+    DeleteWord,
+    Copy,
+    Cut,
+    Paste,
     NewLine,
+    
+    // Custom commands
+    Custom(String),
 
     // Mode switching
     ChangeMode(EditorMode),

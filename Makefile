@@ -10,7 +10,7 @@ SRC_DIR := src
 
 # Default target
 .PHONY: all
-all: check test build
+all: lint test build
 
 # Build the project
 .PHONY: build
@@ -36,79 +36,71 @@ test:
 	@echo "Running tests..."
 	$(TESTS)
 
-# Run with code coverage
-.PHONY: coverage
-coverage:
-	@echo "Running tests with coverage..."
-	CARGO_INCREMENTAL=0 RUSTFLAGS="-Zprofile -Ccodegen-units=1 -Copt-level=0 -Clink-dead-code -Coverflow-checks=off -Zpanic_abort_tests -Cpanic=abort" RUSTDOCFLAGS="-Cpanic=abort" $(TESTS)
-	@echo "For more precise coverage, consider installing grcov or tarpaulin"
-
 # Format code
 .PHONY: fmt
 fmt:
 	@echo "Formatting code..."
-	$(RUSTFMT)
+	$(RUSTFMT) --all
 
-# Opinionated Clippy check
+# Run clippy checks with helpful warnings
 .PHONY: check
 check:
-	@echo "Running Clippy with strict checks..."
+	@echo "Running clippy checks..."
+	$(CLIPPY) -- -D warnings \
+		-W clippy::pedantic \
+		-W clippy::nursery \
+		-D clippy::unwrap_used \
+		-D clippy::expect_used \
+		-W clippy::missing_docs_in_private_items \
+		-D clippy::unimplemented \
+		-D clippy::todo \
+		-W clippy::doc_markdown \
+		-A clippy::module_name_repetitions \
+		-A clippy::must_use_candidate
+
+# Run very strict clippy checks (good for CI)
+.PHONY: check-strict
+check-strict:
+	@echo "Running strict clippy checks..."
 	$(CLIPPY) -- -D warnings \
 		-D clippy::pedantic \
 		-D clippy::nursery \
 		-D clippy::unwrap_used \
 		-D clippy::expect_used \
+		-W clippy::missing_docs_in_private_items \
 		-D clippy::unimplemented \
 		-D clippy::todo \
-		-D clippy::missing_docs_in_private_items \
+		-D clippy::missing_errors_doc \
 		-D clippy::float_cmp \
-		-D clippy::integer_division \
-		-D clippy::redundant_clone \
-		-A clippy::must_use_candidate \
-		-A clippy::missing_errors_doc \
-		-A clippy::module_name_repetitions
+		-D clippy::doc_markdown \
+		-D clippy::module_name_repetitions \
+		-D clippy::wildcard_imports \
+		-D clippy::if_not_else \
+		-D clippy::missing_const_for_fn \
+		-D clippy::redundant_closure
 
-# More permissive Clippy check, good for regular development
+# Basic clippy check for regular development
 .PHONY: lint
 lint:
-	@echo "Running basic Clippy checks..."
-	$(CLIPPY) -- -D warnings
+	@echo "Running basic clippy checks..."
+	$(CLIPPY)
 
-# Fix Clippy warnings where possible
+# Fix clippy warnings where possible
 .PHONY: fix
 fix:
-	@echo "Fixing Clippy warnings where possible..."
+	@echo "Fixing clippy warnings where possible..."
 	$(CLIPPY) --fix --allow-dirty --allow-staged
 
-# Install cargo tools needed for development
-.PHONY: install-tools
-install-tools:
-	@echo "Installing development tools..."
-	$(CARGO) install cargo-watch cargo-update
-
-# Watch for changes and test
-.PHONY: watch
-watch:
-	@echo "Watching for changes..."
-	cargo watch -x test
-
-# Run the basic editor example
+# Run examples
 .PHONY: run-basic
 run-basic:
 	@echo "Running basic editor example..."
 	$(CARGO) run --example basic_editor --features eframe-demo
 
-# Run the minimal example
 .PHONY: run-minimal
 run-minimal:
 	@echo "Running minimal example..."
 	$(CARGO) run --example minimal --features eframe-demo
-
-# Check for outdated dependencies
-.PHONY: outdated
-outdated:
-	@echo "Checking for outdated dependencies..."
-	cargo outdated
 
 # Generate documentation
 .PHONY: doc
@@ -122,33 +114,58 @@ doc-open:
 	@echo "Opening documentation..."
 	$(CARGO) doc --no-deps --open
 
+# Watch for changes and test
+.PHONY: watch
+watch:
+	@echo "Watching for changes..."
+	$(CARGO) watch -x test
+
+# Check for outdated dependencies
+.PHONY: outdated
+outdated:
+	@echo "Checking for outdated dependencies..."
+	$(CARGO) outdated
+
+# Update dependencies
+.PHONY: update
+update:
+	@echo "Updating dependencies..."
+	$(CARGO) update
+
+# Run a benchmark (once we have benchmarks)
+.PHONY: bench
+bench:
+	@echo "Running benchmarks..."
+	$(CARGO) bench
+
 # Clean build artifacts
 .PHONY: clean
 clean:
 	@echo "Cleaning build artifacts..."
 	$(CARGO) clean
 
-# Document rules of this Makefile
+# Display help information
 .PHONY: help
 help:
 	@echo "Ed-Egui Makefile Commands:"
 	@echo ""
-	@echo "make                 - Build, check and test the project"
-	@echo "make build           - Build the project"
-	@echo "make build-all       - Build with all features"
-	@echo "make release         - Build in release mode"
-	@echo "make test            - Run tests"
-	@echo "make coverage        - Run tests with code coverage"
-	@echo "make fmt             - Format code"
-	@echo "make check           - Run strict Clippy checks"
-	@echo "make lint            - Run basic Clippy checks"
-	@echo "make fix             - Fix Clippy warnings where possible"
-	@echo "make install-tools   - Install development tools"
-	@echo "make watch           - Watch for changes and test"
-	@echo "make run-basic       - Run the basic editor example"
-	@echo "make run-minimal     - Run the minimal example"
-	@echo "make outdated        - Check for outdated dependencies"
-	@echo "make doc             - Generate documentation"
-	@echo "make doc-open        - Open documentation in browser"
-	@echo "make clean           - Clean build artifacts"
-	@echo "make help            - Show this help message"
+	@echo "make              - Build, check and test the project"
+	@echo "make build        - Build the project"
+	@echo "make build-all    - Build with all features"
+	@echo "make release      - Build in release mode"
+	@echo "make test         - Run tests"
+	@echo "make fmt          - Format code"
+	@echo "make check        - Run strict clippy checks"
+	@echo "make lint         - Run basic clippy checks"
+	@echo "make fix          - Fix clippy warnings where possible"
+	@echo "make run-basic    - Run the basic editor example"
+	@echo "make run-minimal  - Run the minimal example"
+	@echo "make doc          - Generate documentation"
+	@echo "make doc-open     - Open documentation in browser"
+	@echo "make watch        - Watch for changes and test"
+	@echo "make bench        - Run benchmarks (once implemented)"
+	@echo "make outdated     - Check for outdated dependencies"
+	@echo "make update       - Update dependencies"
+	@echo "make clean        - Clean build artifacts"
+	@echo "make check-strict  - Run very strict clippy checks"
+	@echo "make help         - Show this help message"

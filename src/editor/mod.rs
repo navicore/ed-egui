@@ -6,7 +6,7 @@ use egui::{Color32, Context, Response, RichText, TextEdit, Ui};
 use crate::syntax::HighlightOptions;
 
 use self::buffer::TextBuffer;
-use self::commands::{EditorMode, VimMode};
+use self::commands::{CursorMovement, EditorCommand, EditorMode, VimMode};
 
 /// The main editor widget that implements a simple code editor
 #[derive(Default)]
@@ -113,7 +113,9 @@ impl EditorWidget {
 
                 // Show cursor position
                 let cursor_pos = self.buffer.cursor_position();
-                ui.label(RichText::new(format!("Cursor: {cursor_pos}")).monospace());
+                let line = self.buffer.current_line();
+                let column = self.buffer.current_column();
+                ui.label(RichText::new(format!("Pos: {} (L:{}, C:{})", cursor_pos, line + 1, column + 1)).monospace());
 
                 // Add a spacer to push the right-side content
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -143,7 +145,6 @@ impl EditorWidget {
         if input.key_pressed(egui::Key::Escape)
             && self.current_mode == EditorMode::Vim(VimMode::Insert)
         {
-            //if let EditorMode::Vim(VimMode::Insert) = self.current_mode {
             self.current_mode = EditorMode::Vim(VimMode::Normal);
         }
 
@@ -156,20 +157,48 @@ impl EditorWidget {
         match self.current_mode {
             EditorMode::Vim(VimMode::Normal) => {
                 // Basic Vim normal mode commands
+                // Basic movement
                 if input.key_pressed(egui::Key::H) {
-                    self.buffer.move_cursor_left();
+                    self.execute_command(EditorCommand::MoveCursor(CursorMovement::Left));
                 }
                 if input.key_pressed(egui::Key::L) {
-                    self.buffer.move_cursor_right();
+                    self.execute_command(EditorCommand::MoveCursor(CursorMovement::Right));
                 }
-                if input.key_pressed(egui::Key::X) {
-                    self.buffer.delete_char_forward();
+                if input.key_pressed(egui::Key::J) {
+                    self.execute_command(EditorCommand::MoveCursor(CursorMovement::Down));
                 }
-                if input.key_pressed(egui::Key::End) {
-                    self.buffer.move_to_line_end();
+                if input.key_pressed(egui::Key::K) {
+                    self.execute_command(EditorCommand::MoveCursor(CursorMovement::Up));
                 }
+                
+                // Word movement
+                if input.key_pressed(egui::Key::W) {
+                    self.execute_command(EditorCommand::MoveCursor(CursorMovement::WordRight));
+                }
+                if input.key_pressed(egui::Key::B) {
+                    self.execute_command(EditorCommand::MoveCursor(CursorMovement::WordLeft));
+                }
+                
+                // Line movement
                 if input.key_pressed(egui::Key::Num0) {
-                    self.buffer.move_to_line_start();
+                    self.execute_command(EditorCommand::MoveCursor(CursorMovement::LineStart));
+                }
+                if input.key_pressed(egui::Key::End) || (input.key_pressed(egui::Key::Semicolon) && input.modifiers.shift) {
+                    self.execute_command(EditorCommand::MoveCursor(CursorMovement::LineEnd));
+                }
+                
+                // Document movement
+                if input.key_pressed(egui::Key::G) {
+                    if input.modifiers.shift {
+                        self.execute_command(EditorCommand::MoveCursor(CursorMovement::DocumentEnd));
+                    } else {
+                        self.execute_command(EditorCommand::MoveCursor(CursorMovement::DocumentStart));
+                    }
+                }
+                
+                // Editing
+                if input.key_pressed(egui::Key::X) {
+                    self.execute_command(EditorCommand::DeleteCharForward);
                 }
             }
             EditorMode::Vim(VimMode::Insert) | EditorMode::Emacs => {
@@ -177,36 +206,93 @@ impl EditorWidget {
                 for event in &input.events {
                     if let egui::Event::Text(text) = event {
                         for c in text.chars() {
-                            self.buffer.insert_char(c);
+                            self.execute_command(EditorCommand::InsertChar(c));
                         }
                     }
                 }
 
                 // Handle special keys
                 if input.key_pressed(egui::Key::Backspace) {
-                    self.buffer.delete_char();
+                    self.execute_command(EditorCommand::DeleteChar);
                 }
                 if input.key_pressed(egui::Key::Enter) {
-                    self.buffer.insert_newline();
+                    self.execute_command(EditorCommand::NewLine);
                 }
 
                 // Emacs-style movement
                 if input.modifiers.ctrl {
                     if input.key_pressed(egui::Key::F) {
-                        self.buffer.move_cursor_right();
+                        self.execute_command(EditorCommand::MoveCursor(CursorMovement::Right));
                     }
                     if input.key_pressed(egui::Key::B) {
-                        self.buffer.move_cursor_left();
+                        self.execute_command(EditorCommand::MoveCursor(CursorMovement::Left));
+                    }
+                    if input.key_pressed(egui::Key::P) {
+                        self.execute_command(EditorCommand::MoveCursor(CursorMovement::Up));
+                    }
+                    if input.key_pressed(egui::Key::N) {
+                        self.execute_command(EditorCommand::MoveCursor(CursorMovement::Down));
                     }
                     if input.key_pressed(egui::Key::A) {
-                        self.buffer.move_to_line_start();
+                        self.execute_command(EditorCommand::MoveCursor(CursorMovement::LineStart));
                     }
                     if input.key_pressed(egui::Key::E) {
-                        self.buffer.move_to_line_end();
+                        self.execute_command(EditorCommand::MoveCursor(CursorMovement::LineEnd));
+                    }
+                }
+                
+                // Alt-based word movement in Emacs
+                if input.modifiers.alt {
+                    if input.key_pressed(egui::Key::F) {
+                        self.execute_command(EditorCommand::MoveCursor(CursorMovement::WordRight));
+                    }
+                    if input.key_pressed(egui::Key::B) {
+                        self.execute_command(EditorCommand::MoveCursor(CursorMovement::WordLeft));
+                    }
+                    if input.key_pressed(egui::Key::ArrowRight) {
+                        self.execute_command(EditorCommand::MoveCursor(CursorMovement::WordRight));
+                    }
+                    if input.key_pressed(egui::Key::ArrowLeft) {
+                        self.execute_command(EditorCommand::MoveCursor(CursorMovement::WordLeft));
+                    }
+                }
+                
+                // Document movement
+                if input.modifiers.alt {
+                    if input.key_pressed(egui::Key::Period) && input.modifiers.shift { // M->
+                        self.execute_command(EditorCommand::MoveCursor(CursorMovement::DocumentEnd));
+                    }
+                    if input.key_pressed(egui::Key::Comma) && input.modifiers.shift { // M-<
+                        self.execute_command(EditorCommand::MoveCursor(CursorMovement::DocumentStart));
                     }
                 }
             }
             EditorMode::Vim(_) => {}
+        }
+    }
+    
+    /// Execute an editor command
+    fn execute_command(&mut self, command: EditorCommand) {
+        match command {
+            EditorCommand::InsertChar(c) => self.buffer.insert_char(c),
+            EditorCommand::DeleteChar => self.buffer.delete_char(),
+            EditorCommand::DeleteCharForward => self.buffer.delete_char_forward(),
+            EditorCommand::MoveCursor(movement) => match movement {
+                CursorMovement::Left => self.buffer.move_cursor_left(),
+                CursorMovement::Right => self.buffer.move_cursor_right(),
+                CursorMovement::Up => self.buffer.move_cursor_up(),
+                CursorMovement::Down => self.buffer.move_cursor_down(),
+                CursorMovement::LineStart => self.buffer.move_to_line_start(),
+                CursorMovement::LineEnd => self.buffer.move_to_line_end(),
+                CursorMovement::WordLeft => self.buffer.move_cursor_word_left(),
+                CursorMovement::WordRight => self.buffer.move_cursor_word_right(),
+                CursorMovement::DocumentStart => self.buffer.move_cursor_document_start(),
+                CursorMovement::DocumentEnd => self.buffer.move_cursor_document_end(),
+            },
+            EditorCommand::NewLine => self.buffer.insert_newline(),
+            EditorCommand::ChangeMode(mode) => self.current_mode = mode,
+            // Other commands not yet implemented
+            _ => {}
         }
     }
 }
