@@ -29,4 +29,4 @@ name = "basic_editor"
 required-features = ["eframe-demo"]
 
 [dev-dependencies]
-env_logger = "0.10"
+env_logger = "0.11"
