@@ -1,6 +1,6 @@
-use std::collections::HashMap;
-use egui::{Context, text::LayoutJob, FontId, TextFormat};
 use crate::syntax::{ContentBlock, HighlightTheme, SyntaxHighlighter, TokenType};
+use egui::{text::LayoutJob, Context, FontId, TextFormat};
+use std::collections::HashMap;
 
 /// Highlighter for Markdown content with embedded code blocks
 pub struct MarkdownHighlighter {
@@ -15,18 +15,18 @@ impl MarkdownHighlighter {
             language_highlighters: HashMap::new(),
         }
     }
-    
+
     fn parse_blocks(&self, text: &str) -> Vec<ContentBlock> {
         let mut blocks = Vec::new();
         let mut current_pos = 0;
         let mut in_code_block = false;
         let mut code_block_language = None;
         let mut code_block_start = 0;
-        
+
         for (line_idx, line) in text.lines().enumerate() {
             let line_pos = current_pos;
             let line_len = line.len() + 1; // +1 for newline
-            
+
             // Check for code block delimiter
             if line.trim().starts_with("```") {
                 if in_code_block {
@@ -37,7 +37,7 @@ impl MarkdownHighlighter {
                         language: code_block_language.clone(),
                         is_code_block: true,
                     });
-                    
+
                     in_code_block = false;
                     code_block_language = None;
                 } else {
@@ -54,21 +54,21 @@ impl MarkdownHighlighter {
                             });
                         }
                     }
-                    
+
                     // Parse language from fence
                     let fence_content = line.trim().strip_prefix("```").unwrap_or("");
                     if !fence_content.is_empty() {
                         code_block_language = Some(fence_content.to_string());
                     }
-                    
+
                     code_block_start = line_pos;
                     in_code_block = true;
                 }
             }
-            
+
             current_pos += line_len;
         }
-        
+
         // Add any remaining content
         if current_pos > 0 {
             let last_block_end = blocks.last().map_or(0, |b| b.end);
@@ -76,28 +76,28 @@ impl MarkdownHighlighter {
                 blocks.push(ContentBlock {
                     start: last_block_end,
                     end: current_pos,
-                    language: Some(if in_code_block { 
-                        code_block_language.unwrap_or_else(|| "text".to_string()) 
-                    } else { 
-                        "markdown".to_string() 
+                    language: Some(if in_code_block {
+                        code_block_language.unwrap_or_else(|| "text".to_string())
+                    } else {
+                        "markdown".to_string()
                     }),
                     is_code_block: in_code_block,
                 });
             }
         }
-        
+
         blocks
     }
-    
+
     fn highlight_markdown(&self, text: &str) -> LayoutJob {
         let mut job = LayoutJob::default();
         let mut pos = 0;
-        
+
         // Simple and incomplete markdown highlighting
         for line in text.lines() {
             let line_start = pos;
             let line_len = line.len();
-            
+
             // Headings
             if line.starts_with('#') {
                 let mut level = 0;
@@ -108,7 +108,7 @@ impl MarkdownHighlighter {
                         break;
                     }
                 }
-                
+
                 if level > 0 && level <= 6 && (line.chars().nth(level) == Some(' ')) {
                     // Add the heading markers
                     job.append(
@@ -120,7 +120,7 @@ impl MarkdownHighlighter {
                             ..Default::default()
                         },
                     );
-                    
+
                     // Add the heading text
                     job.append(
                         &line[level..],
@@ -131,7 +131,7 @@ impl MarkdownHighlighter {
                             ..Default::default()
                         },
                     );
-                    
+
                     job.append(
                         "\n",
                         0.0,
@@ -141,17 +141,17 @@ impl MarkdownHighlighter {
                             ..Default::default()
                         },
                     );
-                    
+
                     pos += line_len + 1;
                     continue;
                 }
             }
-            
+
             // Bold/Strong (very simple implementation)
             if line.contains("**") {
                 let parts: Vec<&str> = line.split("**").collect();
                 let mut is_bold = false;
-                
+
                 for (i, part) in parts.iter().enumerate() {
                     let format = if is_bold {
                         TextFormat {
@@ -167,9 +167,9 @@ impl MarkdownHighlighter {
                             ..Default::default()
                         }
                     };
-                    
+
                     job.append(part, 0.0, format);
-                    
+
                     // Add the delimiter except for the last part
                     if i < parts.len() - 1 {
                         if !is_bold {
@@ -198,7 +198,7 @@ impl MarkdownHighlighter {
                         is_bold = !is_bold;
                     }
                 }
-                
+
                 job.append(
                     "\n",
                     0.0,
@@ -208,16 +208,16 @@ impl MarkdownHighlighter {
                         ..Default::default()
                     },
                 );
-                
+
                 pos += line_len + 1;
                 continue;
             }
-            
+
             // Lists (simple implementation)
             if line.trim().starts_with("- ") || line.trim().starts_with("* ") {
                 let indent_len = line.len() - line.trim_start().len();
                 let marker_len = 2; // "- " or "* "
-                
+
                 // Add any indentation
                 if indent_len > 0 {
                     job.append(
@@ -230,7 +230,7 @@ impl MarkdownHighlighter {
                         },
                     );
                 }
-                
+
                 // Add the list marker
                 job.append(
                     &line[indent_len..(indent_len + marker_len)],
@@ -241,7 +241,7 @@ impl MarkdownHighlighter {
                         ..Default::default()
                     },
                 );
-                
+
                 // Add the list text
                 job.append(
                     &line[(indent_len + marker_len)..],
@@ -252,7 +252,7 @@ impl MarkdownHighlighter {
                         ..Default::default()
                     },
                 );
-                
+
                 job.append(
                     "\n",
                     0.0,
@@ -262,11 +262,11 @@ impl MarkdownHighlighter {
                         ..Default::default()
                     },
                 );
-                
+
                 pos += line_len + 1;
                 continue;
             }
-            
+
             // Default formatting for other lines
             job.append(
                 line,
@@ -277,7 +277,7 @@ impl MarkdownHighlighter {
                     ..Default::default()
                 },
             );
-            
+
             job.append(
                 "\n",
                 0.0,
@@ -287,16 +287,16 @@ impl MarkdownHighlighter {
                     ..Default::default()
                 },
             );
-            
+
             pos += line_len + 1;
         }
-        
+
         job
     }
-    
+
     fn highlight_code_block(&self, text: &str, language: Option<&str>) -> LayoutJob {
         let mut job = LayoutJob::default();
-        
+
         // Simple code highlighting for now
         // In a real implementation, you'd invoke the appropriate language highlighter
         job.append(
@@ -309,7 +309,7 @@ impl MarkdownHighlighter {
                 ..Default::default()
             },
         );
-        
+
         job
     }
 }
@@ -317,18 +317,18 @@ impl MarkdownHighlighter {
 impl SyntaxHighlighter for MarkdownHighlighter {
     fn highlight(&self, ctx: &Context, text: &str) -> LayoutJob {
         let mut job = LayoutJob::default();
-        
+
         // Parse content blocks (markdown and code)
         let blocks = self.parse_blocks(text);
-        
+
         for block in blocks {
             let block_text = &text[block.start..block.end];
-            
+
             if block.is_code_block {
                 // Handle code block
                 let fence_line_end = block_text.find('\n').unwrap_or(block_text.len());
                 let fence_line = &block_text[0..fence_line_end];
-                
+
                 // Add the opening fence with language
                 job.append(
                     fence_line,
@@ -339,7 +339,7 @@ impl SyntaxHighlighter for MarkdownHighlighter {
                         ..Default::default()
                     },
                 );
-                
+
                 job.append(
                     "\n",
                     0.0,
@@ -349,13 +349,13 @@ impl SyntaxHighlighter for MarkdownHighlighter {
                         ..Default::default()
                     },
                 );
-                
+
                 // Handle the code block content
                 let content_start = fence_line_end + 1;
                 let content_end = block_text.rfind("```").unwrap_or(block_text.len());
                 if content_start < content_end {
                     let code_content = &block_text[content_start..content_end];
-                    
+
                     // For now, just use a simple highlighting
                     // In a real implementation, you'd use the appropriate language highlighter
                     job.append(
@@ -369,7 +369,7 @@ impl SyntaxHighlighter for MarkdownHighlighter {
                         },
                     );
                 }
-                
+
                 // Add the closing fence
                 if content_end < block_text.len() {
                     job.append(
@@ -388,14 +388,14 @@ impl SyntaxHighlighter for MarkdownHighlighter {
                 job.append_job(markdown_job);
             }
         }
-        
+
         job
     }
-    
+
     fn set_theme(&mut self, theme: HighlightTheme) {
         self.theme = theme;
     }
-    
+
     fn theme(&self) -> &HighlightTheme {
         &self.theme
     }

@@ -15,8 +15,8 @@
 
 ## Example Applications
 
-1. **Basic Editor** - A simple editor with Vim/Emacs modes and basic syntax highlighting
-2. **Minimal** - A minimal test of the egui integration with keyboard input monitoring
+1. **basic_editor** - A simple editor with Vim/Emacs modes and basic syntax highlighting
+2. **minimal** - A minimal test of the egui integration with keyboard input monitoring
 
 ## Running the Examples
 
@@ -26,6 +26,9 @@ cargo run --example basic_editor --features eframe-demo
 
 # Run the minimal example
 cargo run --example minimal --features eframe-demo
+
+# Run the tests
+cargo test
 ```
 
 ## Next Steps

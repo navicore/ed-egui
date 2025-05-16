@@ -1,6 +1,6 @@
-use std::collections::HashMap;
-use egui::{Context, FontId, TextFormat, text::LayoutJob};
 use crate::syntax::{HighlightTheme, SyntaxHighlighter, TokenType};
+use egui::{text::LayoutJob, Context, FontId, TextFormat};
+use std::collections::HashMap;
 
 // This is a placeholder for more complex language parsers
 // In a production implementation, you'd likely use syntect or another syntax highlighting library
@@ -37,10 +37,10 @@ impl LanguageHighlighter {
 impl SyntaxHighlighter for LanguageHighlighter {
     fn highlight(&self, _ctx: &Context, text: &str) -> LayoutJob {
         let mut job = LayoutJob::default();
-        
+
         // Tokenize the input
         let tokens = self.tokenizer.tokenize(text);
-        
+
         // Convert tokens to text spans
         for token in tokens {
             let format = match token.token_type {
@@ -90,17 +90,17 @@ impl SyntaxHighlighter for LanguageHighlighter {
                     ..Default::default()
                 },
             };
-            
+
             job.append(&token.text, 0.0, format);
         }
-        
+
         job
     }
-    
+
     fn set_theme(&mut self, theme: HighlightTheme) {
         self.theme = theme;
     }
-    
+
     fn theme(&self) -> &HighlightTheme {
         &self.theme
     }
@@ -116,28 +116,67 @@ impl Default for RustTokenizer {
     fn default() -> Self {
         Self {
             keywords: vec![
-                "as".to_string(), "break".to_string(), "const".to_string(), 
-                "continue".to_string(), "crate".to_string(), "else".to_string(), 
-                "enum".to_string(), "extern".to_string(), "false".to_string(), 
-                "fn".to_string(), "for".to_string(), "if".to_string(), 
-                "impl".to_string(), "in".to_string(), "let".to_string(), 
-                "loop".to_string(), "match".to_string(), "mod".to_string(), 
-                "move".to_string(), "mut".to_string(), "pub".to_string(), 
-                "ref".to_string(), "return".to_string(), "self".to_string(), 
-                "Self".to_string(), "static".to_string(), "struct".to_string(), 
-                "super".to_string(), "trait".to_string(), "true".to_string(), 
-                "type".to_string(), "unsafe".to_string(), "use".to_string(), 
-                "where".to_string(), "while".to_string(), "async".to_string(), 
-                "await".to_string(), "dyn".to_string(),
+                "as".to_string(),
+                "break".to_string(),
+                "const".to_string(),
+                "continue".to_string(),
+                "crate".to_string(),
+                "else".to_string(),
+                "enum".to_string(),
+                "extern".to_string(),
+                "false".to_string(),
+                "fn".to_string(),
+                "for".to_string(),
+                "if".to_string(),
+                "impl".to_string(),
+                "in".to_string(),
+                "let".to_string(),
+                "loop".to_string(),
+                "match".to_string(),
+                "mod".to_string(),
+                "move".to_string(),
+                "mut".to_string(),
+                "pub".to_string(),
+                "ref".to_string(),
+                "return".to_string(),
+                "self".to_string(),
+                "Self".to_string(),
+                "static".to_string(),
+                "struct".to_string(),
+                "super".to_string(),
+                "trait".to_string(),
+                "true".to_string(),
+                "type".to_string(),
+                "unsafe".to_string(),
+                "use".to_string(),
+                "where".to_string(),
+                "while".to_string(),
+                "async".to_string(),
+                "await".to_string(),
+                "dyn".to_string(),
             ],
             types: vec![
-                "i8".to_string(), "i16".to_string(), "i32".to_string(), 
-                "i64".to_string(), "i128".to_string(), "isize".to_string(), 
-                "u8".to_string(), "u16".to_string(), "u32".to_string(), 
-                "u64".to_string(), "u128".to_string(), "usize".to_string(), 
-                "f32".to_string(), "f64".to_string(), "bool".to_string(), 
-                "char".to_string(), "str".to_string(), "String".to_string(), 
-                "Vec".to_string(), "Option".to_string(), "Result".to_string(),
+                "i8".to_string(),
+                "i16".to_string(),
+                "i32".to_string(),
+                "i64".to_string(),
+                "i128".to_string(),
+                "isize".to_string(),
+                "u8".to_string(),
+                "u16".to_string(),
+                "u32".to_string(),
+                "u64".to_string(),
+                "u128".to_string(),
+                "usize".to_string(),
+                "f32".to_string(),
+                "f64".to_string(),
+                "bool".to_string(),
+                "char".to_string(),
+                "str".to_string(),
+                "String".to_string(),
+                "Vec".to_string(),
+                "Option".to_string(),
+                "Result".to_string(),
             ],
         }
     }
@@ -149,7 +188,7 @@ impl LanguageTokenizer for RustTokenizer {
         let mut current_token = String::new();
         let mut in_string = false;
         let mut in_comment = false;
-        
+
         // This is a very simplistic tokenizer and doesn't handle many edge cases
         for c in text.chars() {
             if in_comment {
@@ -164,7 +203,7 @@ impl LanguageTokenizer for RustTokenizer {
                 }
                 continue;
             }
-            
+
             if in_string {
                 current_token.push(c);
                 if c == '"' && !current_token.ends_with(r#"\""#) {
@@ -177,7 +216,7 @@ impl LanguageTokenizer for RustTokenizer {
                 }
                 continue;
             }
-            
+
             if c.is_alphanumeric() || c == '_' {
                 current_token.push(c);
             } else {
@@ -193,14 +232,14 @@ impl LanguageTokenizer for RustTokenizer {
                     } else {
                         TokenType::Normal
                     };
-                    
+
                     tokens.push(Token {
                         text: current_token,
                         token_type,
                     });
                     current_token = String::new();
                 }
-                
+
                 if c == '"' {
                     current_token.push(c);
                     in_string = true;
@@ -220,7 +259,7 @@ impl LanguageTokenizer for RustTokenizer {
                 }
             }
         }
-        
+
         // Don't forget the last token
         if !current_token.is_empty() {
             let token_type = if self.keywords.contains(&current_token) {
@@ -234,13 +273,13 @@ impl LanguageTokenizer for RustTokenizer {
             } else {
                 TokenType::Normal
             };
-            
+
             tokens.push(Token {
                 text: current_token,
                 token_type,
             });
         }
-        
+
         tokens
     }
 }

@@ -1,7 +1,7 @@
 pub mod buffer;
 pub mod commands;
 
-use egui::{Response, RichText, TextEdit, Ui, Context};
+use egui::{Context, Response, RichText, TextEdit, Ui};
 
 use self::buffer::TextBuffer;
 use self::commands::{EditorMode, VimMode};
@@ -68,20 +68,20 @@ impl EditorWidget {
         let mut layouter = move |ui: &Ui, text: &str, _wrap_width: f32| {
             let mut options = crate::syntax::HighlightOptions::default();
             options.font_size = font_size;
-            
+
             let layout_job = crate::syntax::basic_highlight(text, &options);
             ui.fonts(|fonts| fonts.layout_job(layout_job))
         };
-        
+
         // Create the text edit widget
         let text_edit = TextEdit::multiline(self.buffer.text_mut())
             .id_source(format!("{}_edit", self.id))
             .font(egui::TextStyle::Monospace)
             .desired_width(f32::INFINITY)
             .layouter(&mut layouter);
-            
+
         let response = ui.add(text_edit);
-        
+
         // Show status bar if enabled
         if self.show_status {
             ui.horizontal(|ui| {
@@ -92,44 +92,46 @@ impl EditorWidget {
                     EditorMode::Vim(VimMode::Visual) => "VIM: VISUAL",
                     EditorMode::Emacs => "EMACS",
                 };
-                
+
                 ui.label(RichText::new(mode_text).monospace().strong());
-                
+
                 // Show cursor position
                 let cursor_pos = self.buffer.cursor_position();
                 ui.label(RichText::new(format!("Cursor: {}", cursor_pos)).monospace());
-                
+
                 // Add a spacer to push the right-side content
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    ui.label(RichText::new(format!("Chars: {}", self.buffer.text().len())).monospace());
+                    ui.label(
+                        RichText::new(format!("Chars: {}", self.buffer.text().len())).monospace(),
+                    );
                 });
             });
         }
-        
+
         // Process keyboard input if we have focus
         if response.has_focus() {
             self.process_input(ui.ctx());
         }
-        
+
         response
     }
-    
+
     fn process_input(&mut self, ctx: &Context) {
         let input = ctx.input(|i| i.clone());
-        
+
         // Check for mode switches
         if input.key_pressed(egui::Key::Escape) {
             if let EditorMode::Vim(VimMode::Insert) = self.current_mode {
                 self.current_mode = EditorMode::Vim(VimMode::Normal);
             }
         }
-        
+
         if let EditorMode::Vim(VimMode::Normal) = self.current_mode {
             if input.key_pressed(egui::Key::I) {
                 self.current_mode = EditorMode::Vim(VimMode::Insert);
             }
         }
-        
+
         // Process keystrokes based on mode
         match self.current_mode {
             EditorMode::Vim(VimMode::Normal) => {
@@ -149,7 +151,7 @@ impl EditorWidget {
                 if input.key_pressed(egui::Key::Num0) {
                     self.buffer.move_to_line_start();
                 }
-            },
+            }
             EditorMode::Vim(VimMode::Insert) | EditorMode::Emacs => {
                 // Handle text input
                 for event in &input.events {
@@ -159,7 +161,7 @@ impl EditorWidget {
                         }
                     }
                 }
-                
+
                 // Handle special keys
                 if input.key_pressed(egui::Key::Backspace) {
                     self.buffer.delete_char();
@@ -167,7 +169,7 @@ impl EditorWidget {
                 if input.key_pressed(egui::Key::Enter) {
                     self.buffer.insert_newline();
                 }
-                
+
                 // Emacs-style movement
                 if input.modifiers.ctrl {
                     if input.key_pressed(egui::Key::F) {
@@ -183,7 +185,7 @@ impl EditorWidget {
                         self.buffer.move_to_line_end();
                     }
                 }
-            },
+            }
             _ => {}
         }
     }

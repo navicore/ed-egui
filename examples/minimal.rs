@@ -44,7 +44,7 @@ impl eframe::App for MinimalEditorApp {
                 ui.separator();
                 ui.label("Key presses:");
                 
-                let input = ui.input();
+                let input = ui.input(|i| i.clone());
                 for key in &input.keys_down {
                     if input.key_pressed(*key) {
                         ui.label(format!("Key pressed: {:?}", key));

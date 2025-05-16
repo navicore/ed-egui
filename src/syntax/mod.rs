@@ -24,7 +24,7 @@ impl Default for HighlightOptions {
 /// Basic highlighter function for prototype
 pub fn basic_highlight(text: &str, options: &HighlightOptions) -> LayoutJob {
     let mut job = LayoutJob::default();
-    
+
     // Just highlight a few basic things for the prototype
     for line in text.lines() {
         // Highlight headings in markdown
@@ -67,6 +67,6 @@ pub fn basic_highlight(text: &str, options: &HighlightOptions) -> LayoutJob {
             job.append("\n", 0.0, Default::default());
         }
     }
-    
+
     job
 }

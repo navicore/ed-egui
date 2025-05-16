@@ -5,7 +5,7 @@ pub enum EditorCommand {
     InsertChar(char),
     DeleteChar,
     DeleteCharForward,
-    
+
     // Cursor movement
     MoveCursorLeft,
     MoveCursorRight,
@@ -13,10 +13,10 @@ pub enum EditorCommand {
     MoveCursorDown,
     MoveToLineStart,
     MoveToLineEnd,
-    
+
     // Line operations
     NewLine,
-    
+
     // Mode switching
     ChangeMode(EditorMode),
 }

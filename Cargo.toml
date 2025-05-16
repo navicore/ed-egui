@@ -21,14 +21,6 @@ eframe-demo = ["eframe"]
 bevy = ["bevy_egui"]
 
 [[example]]
-name = "simple_editor"
-required-features = ["eframe-demo"]
-
-[[example]]
-name = "markdown_editor"
-required-features = ["eframe-demo"]
-
-[[example]]
 name = "minimal"
 required-features = ["eframe-demo"]
 
