@@ -1,16 +1,10 @@
 /// Core text buffer implementation with cursor
+#[derive(Default)]
 pub struct TextBuffer {
+    /// The text content of the buffer
     text: String,
+    /// The current cursor position in the text
     cursor_pos: usize, // Simple cursor position as character index
-}
-
-impl Default for TextBuffer {
-    fn default() -> Self {
-        Self {
-            text: String::new(),
-            cursor_pos: 0,
-        }
-    }
 }
 
 impl TextBuffer {
@@ -18,11 +12,12 @@ impl TextBuffer {
         Self::default()
     }
 
+    #[allow(clippy::missing_const_for_fn)]
     pub fn text(&self) -> &str {
         &self.text
     }
 
-    pub fn text_mut(&mut self) -> &mut String {
+    pub const fn text_mut(&mut self) -> &mut String {
         &mut self.text
     }
 
@@ -31,7 +26,7 @@ impl TextBuffer {
         self.cursor_pos = self.cursor_pos.min(self.text.len());
     }
 
-    pub fn cursor_position(&self) -> usize {
+    pub const fn cursor_position(&self) -> usize {
         self.cursor_pos
     }
 
@@ -61,7 +56,7 @@ impl TextBuffer {
     }
 
     // Move cursor left
-    pub fn move_cursor_left(&mut self) {
+    pub const fn move_cursor_left(&mut self) {
         if self.cursor_pos > 0 {
             self.cursor_pos -= 1;
         }

@@ -1,4 +1,4 @@
-use egui::{text::LayoutJob, Color32, FontId};
+use egui::{text::LayoutJob, Color32, FontId, TextFormat};
 
 /// Very basic syntax highlighting for the prototype
 pub struct HighlightOptions {
@@ -32,40 +32,38 @@ pub fn basic_highlight(text: &str, options: &HighlightOptions) -> LayoutJob {
             job.append(
                 line,
                 0.0,
-                egui::TextFormat {
+                TextFormat {
                     font_id: FontId::proportional(options.font_size * 1.5),
                     color: options.heading_color,
                     ..Default::default()
                 },
             );
-            job.append("\n", 0.0, Default::default());
         }
         // Highlight comments
         else if line.trim_start().starts_with("//") {
             job.append(
                 line,
                 0.0,
-                egui::TextFormat {
+                TextFormat {
                     font_id: FontId::monospace(options.font_size),
                     color: options.comment_color,
-                    ..Default::default()
+                    ..TextFormat::default()
                 },
             );
-            job.append("\n", 0.0, Default::default());
         }
         // Default formatting
         else {
             job.append(
                 line,
                 0.0,
-                egui::TextFormat {
+                TextFormat {
                     font_id: FontId::monospace(options.font_size),
                     color: options.text_color,
                     ..Default::default()
                 },
             );
-            job.append("\n", 0.0, Default::default());
         }
+        job.append("\n", 0.0, TextFormat::default());
     }
 
     job

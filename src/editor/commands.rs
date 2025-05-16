@@ -30,7 +30,7 @@ pub enum EditorMode {
 
 impl Default for EditorMode {
     fn default() -> Self {
-        EditorMode::Emacs
+        Self::Emacs
     }
 }
 
@@ -44,6 +44,6 @@ pub enum VimMode {
 
 impl Default for VimMode {
     fn default() -> Self {
-        VimMode::Normal
+        Self::Normal
     }
 }

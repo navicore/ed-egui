@@ -1,5 +1,6 @@
 use eframe::egui;
 
+#[allow(dead_code)]
 struct MinimalEditorApp {
     text: String,
     cursor_pos: usize,

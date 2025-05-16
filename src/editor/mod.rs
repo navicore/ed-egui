@@ -1,7 +1,9 @@
 pub mod buffer;
 pub mod commands;
 
-use egui::{Context, Response, RichText, TextEdit, Ui};
+use egui::{Color32, Context, Response, RichText, TextEdit, Ui};
+
+use crate::syntax::HighlightOptions;
 
 use self::buffer::TextBuffer;
 use self::commands::{EditorMode, VimMode};
@@ -9,10 +11,15 @@ use self::commands::{EditorMode, VimMode};
 /// The main editor widget that implements a simple code editor
 #[derive(Default)]
 pub struct EditorWidget {
+    /// The unique ID for the editor instance
     id: String,
+    /// The text buffer that holds the content of the editor
     buffer: TextBuffer,
+    /// The current mode of the editor (Vim or Emacs)
     current_mode: EditorMode,
+    /// The font size for the editor
     font_size: f32,
+    /// Whether to show the status bar at the bottom
     show_status: bool,
 }
 
@@ -27,17 +34,20 @@ impl EditorWidget {
         }
     }
 
-    pub fn with_mode(mut self, mode: EditorMode) -> Self {
+    #[must_use]
+    pub const fn with_mode(mut self, mode: EditorMode) -> Self {
         self.current_mode = mode;
         self
     }
 
-    pub fn with_font_size(mut self, size: f32) -> Self {
+    #[must_use]
+    pub const fn with_font_size(mut self, size: f32) -> Self {
         self.font_size = size;
         self
     }
 
-    pub fn with_status_bar(mut self, show: bool) -> Self {
+    #[must_use]
+    pub const fn with_status_bar(mut self, show: bool) -> Self {
         self.show_status = show;
         self
     }
@@ -46,7 +56,7 @@ impl EditorWidget {
         self.buffer.text()
     }
 
-    pub fn text_mut(&mut self) -> &mut String {
+    pub const fn text_mut(&mut self) -> &mut String {
         self.buffer.text_mut()
     }
 
@@ -54,11 +64,11 @@ impl EditorWidget {
         self.buffer.set_text(text.into());
     }
 
-    pub fn mode(&self) -> &EditorMode {
+    pub const fn mode(&self) -> &EditorMode {
         &self.current_mode
     }
 
-    pub fn set_mode(&mut self, mode: EditorMode) {
+    pub const fn set_mode(&mut self, mode: EditorMode) {
         self.current_mode = mode;
     }
 
@@ -66,7 +76,13 @@ impl EditorWidget {
         // Create a layouter for basic syntax highlighting
         let font_size = self.font_size;
         let mut layouter = move |ui: &Ui, text: &str, _wrap_width: f32| {
-            let mut options = crate::syntax::HighlightOptions::default();
+            let mut options = HighlightOptions {
+                font_size: 14.0,
+                text_color: Color32::from_rgb(220, 223, 228),
+                keyword_color: Color32::from_rgb(198, 120, 221),
+                comment_color: Color32::from_rgb(92, 99, 112),
+                heading_color: Color32::from_rgb(229, 192, 123),
+            };
             options.font_size = font_size;
 
             let layout_job = crate::syntax::basic_highlight(text, &options);
@@ -97,7 +113,7 @@ impl EditorWidget {
 
                 // Show cursor position
                 let cursor_pos = self.buffer.cursor_position();
-                ui.label(RichText::new(format!("Cursor: {}", cursor_pos)).monospace());
+                ui.label(RichText::new(format!("Cursor: {cursor_pos}")).monospace());
 
                 // Add a spacer to push the right-side content
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -116,20 +132,24 @@ impl EditorWidget {
         response
     }
 
+    /// Process input events for the editor
     fn process_input(&mut self, ctx: &Context) {
-        let input = ctx.input(|i| i.clone());
+        fn fun_name(i: &egui::InputState) -> egui::InputState {
+            i.clone()
+        }
+        let input = ctx.input(fun_name);
 
         // Check for mode switches
-        if input.key_pressed(egui::Key::Escape) {
-            if let EditorMode::Vim(VimMode::Insert) = self.current_mode {
-                self.current_mode = EditorMode::Vim(VimMode::Normal);
-            }
+        if input.key_pressed(egui::Key::Escape)
+            && self.current_mode == EditorMode::Vim(VimMode::Insert)
+        {
+            //if let EditorMode::Vim(VimMode::Insert) = self.current_mode {
+            self.current_mode = EditorMode::Vim(VimMode::Normal);
         }
 
-        if let EditorMode::Vim(VimMode::Normal) = self.current_mode {
-            if input.key_pressed(egui::Key::I) {
-                self.current_mode = EditorMode::Vim(VimMode::Insert);
-            }
+        if self.current_mode == EditorMode::Vim(VimMode::Normal) && input.key_pressed(egui::Key::I)
+        {
+            self.current_mode = EditorMode::Vim(VimMode::Insert);
         }
 
         // Process keystrokes based on mode
@@ -186,7 +206,7 @@ impl EditorWidget {
                     }
                 }
             }
-            _ => {}
+            EditorMode::Vim(_) => {}
         }
     }
 }
