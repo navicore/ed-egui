@@ -1,5 +1,5 @@
 //! Minimal example showing basic integration of the ed-egui widget
-//! 
+//!
 //! This example demonstrates the absolute minimum code needed to use the editor
 //! without focusing on any specific keybinding mode. For examples that focus on
 //! a specific editing mode, see:
@@ -32,9 +32,9 @@ impl eframe::App for MinimalEditorApp {
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.heading("Minimal Editor Example");
             ui.label("The simplest possible integration of ed-egui with an egui app.");
-            
+
             ui.separator();
-            
+
             // Just show the editor - that's it!
             self.editor.show(ui);
         });

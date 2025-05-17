@@ -1,6 +1,6 @@
 //! Emacs-specific editor example
 //!
-//! This example demonstrates how to create an editor that exclusively 
+//! This example demonstrates how to create an editor that exclusively
 //! uses Emacs keybindings. It shows how to:
 //! - Initialize the editor in Emacs mode
 //! - Provide a cheat sheet of available Emacs commands
@@ -33,7 +33,7 @@ This is a specialized editor that only uses Emacs keybindings.
 - Basic: Use `Ctrl+F/B/P/N` for right/left/up/down
 - By Word: Use `Alt+F/B` to move forward/backward by word
 - By Line: Use `Ctrl+A/E` to move to start/end of line
-- By Document: 
+- By Document:
   - Use `Alt+<` (Alt+Shift+,) for document start
   - Use `Alt+>` (Alt+Shift+.) for document end
   - Or use `Ctrl+Home/End` for document start/end
@@ -55,7 +55,7 @@ impl eframe::App for EmacsEditorApp {
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.horizontal(|ui| {
                 ui.heading("Emacs Mode Editor");
-                
+
                 // Display mode info
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     ui.label("EMACS MODE");

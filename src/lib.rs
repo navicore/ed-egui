@@ -4,6 +4,7 @@ pub mod syntax;
 #[cfg(test)]
 mod tests;
 
+// Re-export the main components for easier access
 pub use editor::{
     commands::{EditorMode, VimMode},
     EditorWidget,

@@ -1,6 +1,6 @@
 //! Vim-specific editor example
 //!
-//! This example demonstrates how to create an editor that exclusively 
+//! This example demonstrates how to create an editor that exclusively
 //! uses Vim keybindings. It shows how to:
 //! - Initialize the editor in Vim mode
 //! - Display the current Vim mode (normal, insert, visual)
@@ -60,10 +60,11 @@ impl eframe::App for VimEditorApp {
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.horizontal(|ui| {
                 ui.heading("Vim Mode Editor");
-                
+
                 // Display current Vim mode in the UI
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    match self.editor.mode() {
+                ui.with_layout(
+                    egui::Layout::right_to_left(egui::Align::Center),
+                    |ui| match self.editor.mode() {
                         EditorMode::Vim(VimMode::Normal) => {
                             ui.label("NORMAL MODE");
                         }
@@ -76,8 +77,8 @@ impl eframe::App for VimEditorApp {
                         _ => {
                             ui.label("UNKNOWN MODE");
                         }
-                    }
-                });
+                    },
+                );
             });
 
             ui.separator();
