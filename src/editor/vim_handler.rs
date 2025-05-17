@@ -23,6 +23,7 @@ impl VimKeyHandler {
     pub fn new() -> Self {
         Self::default()
     }
+    
 
     #[must_use]
     pub const fn with_debug(mut self, debug: bool) -> Self {
@@ -46,110 +47,24 @@ impl VimKeyHandler {
         }
     }
 
-    /// Helper method to generate key events for word movement
-    /// 
-    /// This creates multiple key events that will trigger word movement in TextEdit.
-    /// We generate both Ctrl+Arrow and Alt+Arrow events, since different platforms
-    /// might use different key combinations for word movement:
-    /// - Windows/Linux typically use Ctrl+Left/Right
-    /// - macOS typically uses Alt+Left/Right or Option+Left/Right
-    /// 
-    /// By generating both events, we increase the likelihood that TextEdit
-    /// will process at least one of them correctly.
-    fn gen_word_movement_events(&self, is_right: bool) -> Vec<Event> {
-        self.gen_word_movement_events_with_selection(is_right, false)
-    }
-    
-    /// Helper method to generate key events for word movement with optional selection
-    /// 
-    /// This creates multiple key events that will trigger word movement in TextEdit.
-    /// We generate both Ctrl+Arrow and Alt+Arrow events, since different platforms
-    /// might use different key combinations for word movement:
-    /// - Windows/Linux typically use Ctrl+Left/Right
-    /// - macOS typically uses Alt+Left/Right or Option+Left/Right
-    /// 
-    /// If with_selection is true, we add the Shift modifier to select as we move.
-    /// 
-    /// By generating both events, we increase the likelihood that TextEdit
-    /// will process at least one of them correctly.
-    fn gen_word_movement_events_with_selection(&self, is_right: bool, with_selection: bool) -> Vec<Event> {
-        let key = if is_right {
-            Key::ArrowRight
-        } else {
-            Key::ArrowLeft
-        };
-        let physical_key = if is_right {
-            Some(Key::ArrowRight)
-        } else {
-            Some(Key::ArrowLeft)
-        };
-        
-        let mut events = Vec::new();
-        
-        // First try Alt+Arrow (works on macOS as Option+Arrow)
-        {
-            let mut mods = Modifiers::default();
-            mods.alt = true;
-            mods.shift = with_selection; // Add shift if we want to select
-            mods.ctrl = false;
-            mods.command = false;
-            
-            events.push(Event::Key {
-                key,
-                physical_key,
-                pressed: true,
-                repeat: false,
-                modifiers: mods,
-            });
-        }
-        
-        // Then try Ctrl+Arrow (works on Windows/Linux)
-        {
-            let mut mods = Modifiers::default();
-            mods.ctrl = true;
-            mods.shift = with_selection; // Add shift if we want to select
-            mods.alt = false;
-            mods.command = false;
-            
-            events.push(Event::Key {
-                key,
-                physical_key,
-                pressed: true,
-                repeat: false,
-                modifiers: mods,
-            });
-        }
-        
-        println!("DEBUG: Generated {} word movement events (selection: {})", events.len(), with_selection);
-        events
-    }
-    
-    /// Deprecated - use gen_word_movement_events instead
-    fn gen_ctrl_arrow_event(&self, is_right: bool) -> Event {
-        let events = self.gen_word_movement_events(is_right);
-        // Just return the Ctrl+Arrow event for backward compatibility
-        events[1].clone()
-    }
-
     /// Helper method to generate key events for document navigation
     /// 
     /// This creates multiple key events that will trigger document start/end movement in TextEdit.
-    /// We generate both Ctrl+Home/End and Command+Home/End events, since different platforms
-    /// might use different key combinations for document navigation:
+    /// We generate multiple combinations since different platforms use different shortcuts:
     /// - Windows/Linux typically use Ctrl+Home/End
-    /// - macOS might use Command+Home/End or other combinations
+    /// - macOS might use Command+Up/Down, Command+Home/End or other combinations
     fn gen_doc_navigation_events(&self, is_end: bool, with_selection: bool) -> Vec<Event> {
-        let key = if is_end { Key::End } else { Key::Home };
-        let physical_key = if is_end {
-            Some(Key::End)
-        } else {
-            Some(Key::Home)
-        };
-        
         let mut events = Vec::new();
         
-        // First try Ctrl+Home/End (works on Windows/Linux)
+        // Create Home/End events with Ctrl modifier (Windows/Linux)
         {
+            let key = if is_end { Key::End } else { Key::Home };
+            let physical_key = if is_end {
+                Some(Key::End)
+            } else {
+                Some(Key::Home)
+            };
+            
             let mut mods = Modifiers::default();
             mods.ctrl = true;
             mods.shift = with_selection; // Add shift if we want selection
@@ -165,8 +80,15 @@ impl VimKeyHandler {
             });
         }
         
-        // Then try Command+Home/End (works on macOS)
+        // Create Home/End events with Command modifier (macOS)
         {
+            let key = if is_end { Key::End } else { Key::Home };
+            let physical_key = if is_end {
+                Some(Key::End)
+            } else {
+                Some(Key::Home)
+            };
+            
             let mut mods = Modifiers::default();
             mods.command = true;
             mods.shift = with_selection; // Add shift if we want selection
@@ -182,15 +104,56 @@ impl VimKeyHandler {
             });
         }
         
+        // Create Up/Down events with Command modifier (macOS alternative)
+        {
+            let key = if is_end { Key::ArrowDown } else { Key::ArrowUp };
+            let physical_key = if is_end {
+                Some(Key::ArrowDown)
+            } else {
+                Some(Key::ArrowUp)
+            };
+            
+            let mut mods = Modifiers::default();
+            mods.command = true;
+            mods.shift = with_selection; // Add shift if we want selection
+            mods.alt = false;
+            mods.ctrl = false;
+            
+            events.push(Event::Key {
+                key,
+                physical_key,
+                pressed: true,
+                repeat: false,
+                modifiers: mods,
+            });
+        }
+        
+        // Try plain Home/End without modifiers as a fallback
+        // Some applications treat Home/End differently than Ctrl+Home/End
+        if is_end {
+            // Only add this for End key (G) since it's the problematic one
+            events.push(Event::Key {
+                key: Key::End,
+                physical_key: Some(Key::End),
+                pressed: true, 
+                repeat: false,
+                modifiers: Modifiers::default(),
+            });
+            
+            // Also try PageDown key with Control modifier as another option
+            let mut mods = Modifiers::default();
+            mods.ctrl = true;
+            events.push(Event::Key {
+                key: Key::PageDown,
+                physical_key: Some(Key::PageDown),
+                pressed: true,
+                repeat: false,
+                modifiers: mods,
+            });
+        }
+        
         println!("DEBUG: Generated {} document navigation events (selection: {})", events.len(), with_selection);
         events
-    }
-    
-    /// Deprecated - use gen_doc_navigation_events instead
-    fn gen_ctrl_end_home_event(&self, is_end: bool) -> Event {
-        let events = self.gen_doc_navigation_events(is_end, false);
-        // Just return the Ctrl+Home/End event for backward compatibility
-        events[0].clone()
     }
 
     /// Toggle visual mode from normal mode, or go to normal mode from visual mode
@@ -295,41 +258,115 @@ impl VimKeyHandler {
                         });
                     }
 
-                    // Word movement - map directly to word movement events that TextEdit understands
+                    // Word movement using custom implementation for vim-like behavior
                     Key::W => {
                         // Capital W and lowercase w both move by word in the same way
-                        self.debug_log("'w/W' key pressed - mapping to word-right movement");
+                        self.debug_log("'w/W' key pressed - mapping to improved multi-step word movement");
                         println!("DEBUG: Processing W key in normal mode");
-                        println!("DEBUG: Initial input.events: {:?}", input.events);
                         events_to_remove.extend(0..input.events.len());
-                        println!("DEBUG: After marking events for removal: {:?}", events_to_remove);
-
-                        // Generate platform-appropriate word movement events
-                        let events = self.gen_word_movement_events(true);
-                        println!("DEBUG: Generated {} events for word movement", events.len());
                         
-                        // Add all generated events to the input queue
-                        for event in events {
-                            println!("DEBUG: Adding word movement event: {:?}", event);
-                            input.events.push(event);
-                        }
-                        println!("DEBUG: After adding new events: {:?}", input.events);
+                        // IMPROVED IMPLEMENTATION:
+                        // The previous implementation sometimes went past the next word and stopped
+                        // at whitespace. This refined approach handles that edge case better.
+                        
+                        // Step 1: Use Right arrow to move right once
+                        // This ensures we're not at the beginning of the current word
+                        input.events.push(Event::Key {
+                            key: Key::ArrowRight,
+                            physical_key: Some(Key::ArrowRight),
+                            pressed: true,
+                            repeat: false,
+                            modifiers: Modifiers::default(),
+                        });
+                        
+                        // Step 2: Use Ctrl+Right to get to the next word
+                        // This will move to the beginning of the next word
+                        let mut mods = Modifiers::default();
+                        mods.ctrl = true;
+                        input.events.push(Event::Key {
+                            key: Key::ArrowRight,
+                            physical_key: Some(Key::ArrowRight),
+                            pressed: true,
+                            repeat: false,
+                            modifiers: mods,
+                        });
+                        
+                        // Step 3: Use Alt+Right as well (for macOS)
+                        // Some platforms use Alt instead of Ctrl for word movement
+                        let mut alt_mods = Modifiers::default();
+                        alt_mods.alt = true;
+                        input.events.push(Event::Key {
+                            key: Key::ArrowRight,
+                            physical_key: Some(Key::ArrowRight),
+                            pressed: true,
+                            repeat: false,
+                            modifiers: alt_mods,
+                        });
+                        
+                        // Step 4: If we're already at a word, the above events might not move
+                        // So we add another sequence to ensure we move to the next word
+                        
+                        // First, move right to ensure we're not at the beginning of a word
+                        input.events.push(Event::Key {
+                            key: Key::ArrowRight,
+                            physical_key: Some(Key::ArrowRight),
+                            pressed: true,
+                            repeat: false,
+                            modifiers: Modifiers::default(),
+                        });
+                        
+                        // Then try Ctrl+Right again (Windows/Linux style)
+                        input.events.push(Event::Key {
+                            key: Key::ArrowRight,
+                            physical_key: Some(Key::ArrowRight),
+                            pressed: true,
+                            repeat: false,
+                            modifiers: mods,
+                        });
                     }
                     Key::B => {
                         // Capital B and lowercase b both move by word backward in the same way
-                        self.debug_log("'b/B' key pressed - mapping to word-left movement");
+                        self.debug_log("'b/B' key pressed - mapping to multi-step word movement");
                         println!("DEBUG: Processing B key in normal mode");
                         events_to_remove.extend(0..input.events.len());
-
-                        // Generate platform-appropriate word movement events
-                        let events = self.gen_word_movement_events(false);
-                        println!("DEBUG: Generated {} events for word movement", events.len());
                         
-                        // Add all generated events to the input queue
-                        for event in events {
-                            println!("DEBUG: Adding word movement event: {:?}", event);
-                            input.events.push(event);
-                        }
+                        // Step 1: Try Home key to get to the beginning of the current line
+                        input.events.push(Event::Key {
+                            key: Key::Home,
+                            physical_key: Some(Key::Home),
+                            pressed: true,
+                            repeat: false,
+                            modifiers: Modifiers::default(),
+                        });
+                        
+                        // Step 2: Use Ctrl+Left to ensure we're at the beginning of a word
+                        let mut mods = Modifiers::default();
+                        mods.ctrl = true;
+                        input.events.push(Event::Key {
+                            key: Key::ArrowLeft,
+                            physical_key: Some(Key::ArrowLeft),
+                            pressed: true,
+                            repeat: false,
+                            modifiers: mods,
+                        });
+                        
+                        // Step 3: Use left arrow to potentially move between words
+                        input.events.push(Event::Key {
+                            key: Key::ArrowLeft,
+                            physical_key: Some(Key::ArrowLeft),
+                            pressed: true,
+                            repeat: false,
+                            modifiers: Modifiers::default(),
+                        });
+                        
+                        // Step 4: Use Home to get to the beginning of the line if we change lines
+                        input.events.push(Event::Key {
+                            key: Key::Home,
+                            physical_key: Some(Key::Home),
+                            pressed: true,
+                            repeat: false,
+                            modifiers: Modifiers::default(),
+                        });
                     }
 
                     // Line movement - translate to Home/End keys
@@ -460,28 +497,113 @@ impl VimKeyHandler {
 
         // Generate word motion events for 'w'
         if w_key_text_pressed {
-            self.debug_log("Converting 'w' text to word-right movement events");
-            let events = self.gen_word_movement_events(true);
-            println!("DEBUG: Generated {} events for word-right movement from text event", events.len());
+            self.debug_log("Converting 'w' text to improved multi-step word movement");
             
-            // Add all generated events to the input queue
-            for event in events {
-                println!("DEBUG: Adding word-right movement event from text: {:?}", event);
-                input.events.push(event);
-            }
+            // IMPROVED IMPLEMENTATION:
+            // The previous implementation sometimes went past the next word and stopped
+            // at whitespace. This refined approach handles that edge case better.
+            
+            // Step 1: Use Right arrow to move right once
+            // This ensures we're not at the beginning of the current word
+            input.events.push(Event::Key {
+                key: Key::ArrowRight,
+                physical_key: Some(Key::ArrowRight),
+                pressed: true,
+                repeat: false,
+                modifiers: Modifiers::default(),
+            });
+            
+            // Step 2: Use Ctrl+Right to get to the next word
+            // This will move to the beginning of the next word
+            let mut mods = Modifiers::default();
+            mods.ctrl = true;
+            input.events.push(Event::Key {
+                key: Key::ArrowRight,
+                physical_key: Some(Key::ArrowRight),
+                pressed: true,
+                repeat: false,
+                modifiers: mods,
+            });
+            
+            // Step 3: Use Alt+Right as well (for macOS)
+            // Some platforms use Alt instead of Ctrl for word movement
+            let mut alt_mods = Modifiers::default();
+            alt_mods.alt = true;
+            input.events.push(Event::Key {
+                key: Key::ArrowRight,
+                physical_key: Some(Key::ArrowRight),
+                pressed: true,
+                repeat: false,
+                modifiers: alt_mods,
+            });
+            
+            // Step 4: If we're already at a word, the above events might not move
+            // So we add another sequence to ensure we move to the next word
+            
+            // First, move right to ensure we're not at the beginning of a word
+            input.events.push(Event::Key {
+                key: Key::ArrowRight,
+                physical_key: Some(Key::ArrowRight),
+                pressed: true,
+                repeat: false,
+                modifiers: Modifiers::default(),
+            });
+            
+            // Then try Ctrl+Right again (Windows/Linux style)
+            input.events.push(Event::Key {
+                key: Key::ArrowRight,
+                physical_key: Some(Key::ArrowRight),
+                pressed: true,
+                repeat: false,
+                modifiers: mods,
+            });
+            
+            println!("DEBUG: Added improved multi-step events for word-right movement");
         }
 
         // Generate word motion events for 'b'
         if b_key_text_pressed {
-            self.debug_log("Converting 'b' text to word-left movement events");
-            let events = self.gen_word_movement_events(false);
-            println!("DEBUG: Generated {} events for word-left movement from text event", events.len());
+            self.debug_log("Converting 'b' text to multi-step word movement");
             
-            // Add all generated events to the input queue
-            for event in events {
-                println!("DEBUG: Adding word-left movement event from text: {:?}", event);
-                input.events.push(event);
-            }
+            // Step 1: Try Home key to get to the beginning of the current line
+            input.events.push(Event::Key {
+                key: Key::Home,
+                physical_key: Some(Key::Home),
+                pressed: true,
+                repeat: false,
+                modifiers: Modifiers::default(),
+            });
+            
+            // Step 2: Use Ctrl+Left to ensure we're at the beginning of a word
+            let mut mods = Modifiers::default();
+            mods.ctrl = true;
+            input.events.push(Event::Key {
+                key: Key::ArrowLeft,
+                physical_key: Some(Key::ArrowLeft),
+                pressed: true,
+                repeat: false,
+                modifiers: mods,
+            });
+            
+            // Step 3: Use left arrow to potentially move between words
+            input.events.push(Event::Key {
+                key: Key::ArrowLeft,
+                physical_key: Some(Key::ArrowLeft),
+                pressed: true,
+                repeat: false,
+                modifiers: Modifiers::default(),
+            });
+            
+            // Step 4: Use Home to get to the beginning of the line if we change lines
+            input.events.push(Event::Key {
+                key: Key::Home,
+                physical_key: Some(Key::Home),
+                pressed: true,
+                repeat: false,
+                modifiers: Modifiers::default(),
+            });
+            
+            println!("DEBUG: Added multi-step events for word-left movement");
         }
 
         // Generate document motion events for 'g'
@@ -638,36 +760,121 @@ impl VimKeyHandler {
                     Key::W => {
                         // Both Capital W and lowercase w both move by word with selection
                         self.debug_log(
-                            "'w/W' key pressed in visual mode - mapping to word-right with selection",
+                            "'w/W' key pressed in visual mode - mapping to improved multi-step movement with selection",
                         );
                         events_to_remove.extend(0..input.events.len());
                         
-                        // Generate word movement events for visual mode (with selection)
-                        let events = self.gen_word_movement_events_with_selection(true, true);
-                        println!("DEBUG: Generated {} word-right events with selection", events.len());
+                        // IMPROVED IMPLEMENTATION:
+                        // The previous implementation sometimes went past the next word and stopped
+                        // at whitespace. This refined approach handles that edge case better.
                         
-                        // Add all generated events to the input queue
-                        for event in events {
-                            println!("DEBUG: Adding visual mode word-right event: {:?}", event);
-                            input.events.push(event);
-                        }
+                        // Step 1: Use Right arrow to move right once with selection
+                        let mut right_mods = Modifiers::default();
+                        right_mods.shift = true; // Add shift for selection
+                        input.events.push(Event::Key {
+                            key: Key::ArrowRight,
+                            physical_key: Some(Key::ArrowRight),
+                            pressed: true,
+                            repeat: false,
+                            modifiers: right_mods,
+                        });
+                        
+                        // Step 2: Use Ctrl+Right to get to the next word with selection
+                        let mut ctrl_right_mods = Modifiers::default();
+                        ctrl_right_mods.ctrl = true;
+                        ctrl_right_mods.shift = true; // Add shift for selection
+                        input.events.push(Event::Key {
+                            key: Key::ArrowRight,
+                            physical_key: Some(Key::ArrowRight),
+                            pressed: true,
+                            repeat: false,
+                            modifiers: ctrl_right_mods,
+                        });
+                        
+                        // Step 3: Use Alt+Right as well (for macOS) with selection
+                        let mut alt_right_mods = Modifiers::default();
+                        alt_right_mods.alt = true;
+                        alt_right_mods.shift = true; // Add shift for selection
+                        input.events.push(Event::Key {
+                            key: Key::ArrowRight,
+                            physical_key: Some(Key::ArrowRight),
+                            pressed: true,
+                            repeat: false,
+                            modifiers: alt_right_mods,
+                        });
+                        
+                        // Step 4: If we're already at a word, the above events might not move
+                        // So we add another sequence to ensure we move to the next word, still with selection
+                        
+                        // First, move right to ensure we're not at the beginning of a word
+                        input.events.push(Event::Key {
+                            key: Key::ArrowRight,
+                            physical_key: Some(Key::ArrowRight),
+                            pressed: true,
+                            repeat: false,
+                            modifiers: right_mods, // Using already defined right_mods with shift
+                        });
+                        
+                        // Then try Ctrl+Right again (Windows/Linux style) with selection
+                        input.events.push(Event::Key {
+                            key: Key::ArrowRight,
+                            physical_key: Some(Key::ArrowRight),
+                            pressed: true,
+                            repeat: false,
+                            modifiers: ctrl_right_mods, // Using already defined ctrl_right_mods with shift
+                        });
                     }
                     Key::B => {
                         // Both Capital B and lowercase b move by word backward with selection
                         self.debug_log(
-                            "'b/B' key pressed in visual mode - mapping to word-left with selection",
+                            "'b/B' key pressed in visual mode - mapping to multi-step movement with selection",
                         );
                         events_to_remove.extend(0..input.events.len());
                         
-                        // Generate word movement events for visual mode (with selection)
-                        let events = self.gen_word_movement_events_with_selection(false, true);
-                        println!("DEBUG: Generated {} word-left events with selection", events.len());
+                        // Step 1: Try Home key to get to the beginning of the current line
+                        let mut home_mods = Modifiers::default();
+                        home_mods.shift = true; // Add shift for selection
+                        input.events.push(Event::Key {
+                            key: Key::Home,
+                            physical_key: Some(Key::Home),
+                            pressed: true,
+                            repeat: false,
+                            modifiers: home_mods,
+                        });
                         
-                        // Add all generated events to the input queue
-                        for event in events {
-                            println!("DEBUG: Adding visual mode word-left event: {:?}", event);
-                            input.events.push(event);
-                        }
+                        // Step 2: Use Ctrl+Left to ensure we're at the beginning of a word
+                        let mut ctrl_left_mods = Modifiers::default();
+                        ctrl_left_mods.ctrl = true;
+                        ctrl_left_mods.shift = true; // Add shift for selection
+                        input.events.push(Event::Key {
+                            key: Key::ArrowLeft,
+                            physical_key: Some(Key::ArrowLeft),
+                            pressed: true,
+                            repeat: false,
+                            modifiers: ctrl_left_mods,
+                        });
+                        
+                        // Step 3: Use left arrow to potentially move between words
+                        let mut left_mods = Modifiers::default();
+                        left_mods.shift = true; // Add shift for selection
+                        input.events.push(Event::Key {
+                            key: Key::ArrowLeft,
+                            physical_key: Some(Key::ArrowLeft),
+                            pressed: true,
+                            repeat: false,
+                            modifiers: left_mods,
+                        });
+                        
+                        // Step 4: Use Home to get to the beginning of the line if we change lines
+                        let mut home2_mods = Modifiers::default();
+                        home2_mods.shift = true; // Add shift for selection
+                        input.events.push(Event::Key {
+                            key: Key::Home,
+                            physical_key: Some(Key::Home),
+                            pressed: true,
+                            repeat: false,
+                            modifiers: home2_mods,
+                        });
                     }
 
                     // Line movement - translate to Shift+Home/End keys

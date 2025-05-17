@@ -4,12 +4,12 @@ pub mod emacs_handler;
 pub mod keyhandler;
 pub mod vim_handler;
 
-use egui::{Color32, Context, Key, Response, RichText, TextEdit, Ui};
+use egui::{Color32, Context, Event, Key, Response, RichText, TextEdit, Ui};
 
 use crate::syntax::HighlightOptions;
 
-use self::buffer::TextBuffer;
-use self::commands::{EditorCommand, EditorMode, VimMode};
+use self::buffer::TextBuffer as BufferImpl;
+use self::commands::{EditorMode, VimMode};
 use self::emacs_handler::EmacsKeyHandler;
 use self::keyhandler::KeyHandler;
 use self::vim_handler::VimKeyHandler;
@@ -19,7 +19,7 @@ pub struct EditorWidget {
     /// The unique ID for the editor instance
     id: String,
     /// The text buffer that holds the content of the editor
-    buffer: TextBuffer,
+    buffer: BufferImpl,
     /// The current mode of the editor (Vim or Emacs)
     current_mode: EditorMode,
     /// The font size for the editor
@@ -38,7 +38,7 @@ impl Default for EditorWidget {
     fn default() -> Self {
         Self {
             id: String::new(),
-            buffer: TextBuffer::default(),
+            buffer: BufferImpl::default(),
             current_mode: EditorMode::Emacs, // Default to Emacs mode
             font_size: 14.0,
             show_status: true,
@@ -53,7 +53,7 @@ impl EditorWidget {
     pub fn new(id: impl Into<String>) -> Self {
         Self {
             id: id.into(),
-            buffer: TextBuffer::default(),
+            buffer: BufferImpl::default(),
             current_mode: EditorMode::Emacs, // Default to Emacs mode
             font_size: 14.0,
             show_status: true,
@@ -168,8 +168,10 @@ impl EditorWidget {
         };
 
         // 4. Create a TextEdit widget for all modes - unified approach
+        // Create the TextEdit widget
+        let id = format!("{}_edit", self.id);
         let mut text_edit = TextEdit::multiline(self.buffer.text_mut())
-            .id_source(format!("{}_edit", self.id))
+            .id_source(id)
             .font(egui::TextStyle::Monospace)
             .desired_width(f32::INFINITY)
             .layouter(&mut layouter);
@@ -259,6 +261,7 @@ impl EditorWidget {
 
     /// Intercept and process keyboard input before the UI is created
     fn process_input_before_ui(&mut self, ctx: &Context) {
+        
         // We need to manipulate the input events to handle our custom key bindings
         ctx.input_mut(|input| {
             // Enhanced debug print of all input events
@@ -306,8 +309,16 @@ impl EditorWidget {
                         events_to_remove
                     );
 
-                    // Word movement is now handled directly in vim_handler.rs
-                    // No special marker processing needed here anymore
+                    // Look for custom cursor movement signals
+                    let mut custom_events_to_remove = Vec::new();
+                    for (i, event) in input.events.iter().enumerate() {
+                        if let Event::Text(text) = event {
+                            if text.starts_with("__CUSTOM_CURSOR__:") {
+                                custom_events_to_remove.push(i);
+                            }
+                        }
+                    }
+                    events_to_remove.extend(custom_events_to_remove);
 
                     // Update last cursor position for Vim normal mode after commands
                     if matches!(self.current_mode, EditorMode::Vim(VimMode::Normal)) {
@@ -345,139 +356,6 @@ impl EditorWidget {
             }
         });
     }
+    
 
-    /// Execute an editor command
-    /// NOTE: This function is primarily used for basic operations like insertion and deletion.
-    /// For cursor movements, we prefer to generate TextEdit-compatible events directly in the
-    /// key handlers (vim_handler.rs and emacs_handler.rs) rather than routing through here.
-    fn execute_command(&mut self, command: &EditorCommand) {
-        println!("DEBUG: Executing command: {:?}", command);
-
-        match command {
-            EditorCommand::InsertChar(c) => self.buffer.insert_char(*c),
-            EditorCommand::DeleteChar => self.buffer.delete_char(),
-            EditorCommand::DeleteCharForward => self.buffer.delete_char_forward(),
-            EditorCommand::MoveCursor(movement) => {
-                println!("DEBUG: Executing cursor movement: {:?}", movement);
-
-                // Print a message that cursor movement commands are now handled
-                // by directly generating events in the key handlers
-                println!("NOTE: Cursor movements are now handled via key events generated in the key handlers");
-                println!("This method is no longer the primary way to move the cursor");
-
-                // We can't easily generate input events here since we don't have
-                // the Context object. The direct event generation in the key handlers
-                // is the preferred approach.
-                /*
-                // Example of what we would do if we had the context:
-                ctx.input_mut(|input| {
-                    let mut event = match movement {
-                        CursorMovement::Left => Event::Key {
-                            key: Key::ArrowLeft,
-                            physical_key: Some(Key::ArrowLeft),
-                            pressed: true,
-                            repeat: false,
-                            modifiers: Modifiers::default(),
-                        },
-                        CursorMovement::Right => Event::Key {
-                            key: Key::ArrowRight,
-                            physical_key: Some(Key::ArrowRight),
-                            pressed: true,
-                            repeat: false,
-                            modifiers: Modifiers::default(),
-                        },
-                        CursorMovement::Up => Event::Key {
-                            key: Key::ArrowUp,
-                            physical_key: Some(Key::ArrowUp),
-                            pressed: true,
-                            repeat: false,
-                            modifiers: Modifiers::default(),
-                        },
-                        CursorMovement::Down => Event::Key {
-                            key: Key::ArrowDown,
-                            physical_key: Some(Key::ArrowDown),
-                            pressed: true,
-                            repeat: false,
-                            modifiers: Modifiers::default(),
-                        },
-                        CursorMovement::WordLeft => {
-                            let mut mods = Modifiers::default();
-                            mods.ctrl = true;
-
-                            Event::Key {
-                                key: Key::ArrowLeft,
-                                physical_key: Some(Key::ArrowLeft),
-                                pressed: true,
-                                repeat: false,
-                                modifiers: mods,
-                            }
-                        },
-                        CursorMovement::WordRight => {
-                            let mut mods = Modifiers::default();
-                            mods.ctrl = true;
-
-                            Event::Key {
-                                key: Key::ArrowRight,
-                                physical_key: Some(Key::ArrowRight),
-                                pressed: true,
-                                repeat: false,
-                                modifiers: mods,
-                            }
-                        },
-                        CursorMovement::LineStart => Event::Key {
-                            key: Key::Home,
-                            physical_key: Some(Key::Home),
-                            pressed: true,
-                            repeat: false,
-                            modifiers: Modifiers::default(),
-                        },
-                        CursorMovement::LineEnd => Event::Key {
-                            key: Key::End,
-                            physical_key: Some(Key::End),
-                            pressed: true,
-                            repeat: false,
-                            modifiers: Modifiers::default(),
-                        },
-                        CursorMovement::DocumentStart => {
-                            let mut mods = Modifiers::default();
-                            mods.ctrl = true;
-
-                            Event::Key {
-                                key: Key::Home,
-                                physical_key: Some(Key::Home),
-                                pressed: true,
-                                repeat: false,
-                                modifiers: mods,
-                            }
-                        },
-                        CursorMovement::DocumentEnd => {
-                            let mut mods = Modifiers::default();
-                            mods.ctrl = true;
-
-                            Event::Key {
-                                key: Key::End,
-                                physical_key: Some(Key::End),
-                                pressed: true,
-                                repeat: false,
-                                modifiers: mods,
-                            }
-                        },
-                    };
-
-                    input.events.push(event);
-                    println!("DEBUG: Generated TextEdit-compatible event for movement: {:?}", movement);
-                });
-                */
-            }
-            EditorCommand::NewLine => self.buffer.insert_newline(),
-            EditorCommand::ChangeMode(mode) => self.current_mode = *mode,
-            _ => {} // Other commands not yet implemented
-        }
-
-        // Store the current cursor position for vim normal mode
-        // This helps us keep track of our cursor position after events
-        if matches!(self.current_mode, EditorMode::Vim(VimMode::Normal)) {
-            self.last_cursor_pos = self.buffer.cursor_position();
-        }
-    }
 }
