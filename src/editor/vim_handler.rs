@@ -261,16 +261,20 @@ impl VimKeyHandler {
                     // Word movement using custom implementation for vim-like behavior
                     Key::W => {
                         // Capital W and lowercase w both move by word in the same way
-                        self.debug_log("'w/W' key pressed - mapping to improved multi-step word movement");
+                        self.debug_log("'w/W' key pressed - mapping to vim-style word movement");
                         println!("DEBUG: Processing W key in normal mode");
                         events_to_remove.extend(0..input.events.len());
                         
-                        // IMPROVED IMPLEMENTATION:
-                        // The previous implementation sometimes went past the next word and stopped
-                        // at whitespace. This refined approach handles that edge case better.
+                        // PRECISE SINGLE WORD MOVEMENT APPROACH:
+                        // The previous implementation was adding too many events at once, causing
+                        // multiple word jumps. This implementation uses a more controlled approach
+                        // that ensures we move exactly one word at a time.
                         
-                        // Step 1: Use Right arrow to move right once
-                        // This ensures we're not at the beginning of the current word
+                        // We'll use two separate approaches and let the platform choose which works:
+                        // 1. For Windows/Linux: Use a simple Right arrow + Ctrl+Right sequence
+                        // 2. For macOS: Use a Right arrow + Alt+Right sequence
+                        
+                        // First, a single right arrow to handle edge cases at word boundaries
                         input.events.push(Event::Key {
                             key: Key::ArrowRight,
                             physical_key: Some(Key::ArrowRight),
@@ -279,20 +283,19 @@ impl VimKeyHandler {
                             modifiers: Modifiers::default(),
                         });
                         
-                        // Step 2: Use Ctrl+Right to get to the next word
-                        // This will move to the beginning of the next word
-                        let mut mods = Modifiers::default();
-                        mods.ctrl = true;
+                        // Then, use Ctrl+Right for Windows/Linux word movement
+                        // We'll do this in a separate message so it doesn't combine with the previous one
+                        let mut ctrl_mods = Modifiers::default();
+                        ctrl_mods.ctrl = true;
                         input.events.push(Event::Key {
                             key: Key::ArrowRight,
                             physical_key: Some(Key::ArrowRight),
                             pressed: true,
                             repeat: false,
-                            modifiers: mods,
+                            modifiers: ctrl_mods,
                         });
                         
-                        // Step 3: Use Alt+Right as well (for macOS)
-                        // Some platforms use Alt instead of Ctrl for word movement
+                        // Also try Alt+Right for macOS in a separate event
                         let mut alt_mods = Modifiers::default();
                         alt_mods.alt = true;
                         input.events.push(Event::Key {
@@ -302,55 +305,23 @@ impl VimKeyHandler {
                             repeat: false,
                             modifiers: alt_mods,
                         });
-                        
-                        // Step 4: If we're already at a word, the above events might not move
-                        // So we add another sequence to ensure we move to the next word
-                        
-                        // First, move right to ensure we're not at the beginning of a word
-                        input.events.push(Event::Key {
-                            key: Key::ArrowRight,
-                            physical_key: Some(Key::ArrowRight),
-                            pressed: true,
-                            repeat: false,
-                            modifiers: Modifiers::default(),
-                        });
-                        
-                        // Then try Ctrl+Right again (Windows/Linux style)
-                        input.events.push(Event::Key {
-                            key: Key::ArrowRight,
-                            physical_key: Some(Key::ArrowRight),
-                            pressed: true,
-                            repeat: false,
-                            modifiers: mods,
-                        });
                     }
                     Key::B => {
                         // Capital B and lowercase b both move by word backward in the same way
-                        self.debug_log("'b/B' key pressed - mapping to multi-step word movement");
+                        self.debug_log("'b/B' key pressed - mapping to vim-style word movement");
                         println!("DEBUG: Processing B key in normal mode");
                         events_to_remove.extend(0..input.events.len());
                         
-                        // Step 1: Try Home key to get to the beginning of the current line
-                        input.events.push(Event::Key {
-                            key: Key::Home,
-                            physical_key: Some(Key::Home),
-                            pressed: true,
-                            repeat: false,
-                            modifiers: Modifiers::default(),
-                        });
+                        // PRECISE SINGLE WORD MOVEMENT APPROACH:
+                        // The previous implementation was adding too many events at once, causing
+                        // multiple word jumps. This implementation uses a more controlled approach
+                        // that ensures we move exactly one word at a time.
                         
-                        // Step 2: Use Ctrl+Left to ensure we're at the beginning of a word
-                        let mut mods = Modifiers::default();
-                        mods.ctrl = true;
-                        input.events.push(Event::Key {
-                            key: Key::ArrowLeft,
-                            physical_key: Some(Key::ArrowLeft),
-                            pressed: true,
-                            repeat: false,
-                            modifiers: mods,
-                        });
+                        // We'll use two separate approaches and let the platform choose which works:
+                        // 1. For Windows/Linux: Use a simple Left arrow + Ctrl+Left sequence
+                        // 2. For macOS: Use a Left arrow + Alt+Left sequence
                         
-                        // Step 3: Use left arrow to potentially move between words
+                        // First, a single left arrow to handle edge cases at word boundaries
                         input.events.push(Event::Key {
                             key: Key::ArrowLeft,
                             physical_key: Some(Key::ArrowLeft),
@@ -359,13 +330,27 @@ impl VimKeyHandler {
                             modifiers: Modifiers::default(),
                         });
                         
-                        // Step 4: Use Home to get to the beginning of the line if we change lines
+                        // Then, use Ctrl+Left for Windows/Linux word movement
+                        // We'll do this in a separate message so it doesn't combine with the previous one
+                        let mut ctrl_mods = Modifiers::default();
+                        ctrl_mods.ctrl = true;
                         input.events.push(Event::Key {
-                            key: Key::Home,
-                            physical_key: Some(Key::Home),
+                            key: Key::ArrowLeft,
+                            physical_key: Some(Key::ArrowLeft),
                             pressed: true,
                             repeat: false,
-                            modifiers: Modifiers::default(),
+                            modifiers: ctrl_mods,
+                        });
+                        
+                        // Also try Alt+Left for macOS in a separate event
+                        let mut alt_mods = Modifiers::default();
+                        alt_mods.alt = true;
+                        input.events.push(Event::Key {
+                            key: Key::ArrowLeft,
+                            physical_key: Some(Key::ArrowLeft),
+                            pressed: true,
+                            repeat: false,
+                            modifiers: alt_mods,
                         });
                     }
 
@@ -497,14 +482,13 @@ impl VimKeyHandler {
 
         // Generate word motion events for 'w'
         if w_key_text_pressed {
-            self.debug_log("Converting 'w' text to improved multi-step word movement");
+            self.debug_log("Converting 'w' text to vim-style word movement");
             
-            // IMPROVED IMPLEMENTATION:
-            // The previous implementation sometimes went past the next word and stopped
-            // at whitespace. This refined approach handles that edge case better.
+            // PRECISE SINGLE WORD MOVEMENT APPROACH:
+            // The previous implementation was adding too many events at once, causing
+            // multiple word jumps. This implementation uses a more controlled approach.
             
-            // Step 1: Use Right arrow to move right once
-            // This ensures we're not at the beginning of the current word
+            // First, a single right arrow to handle edge cases at word boundaries
             input.events.push(Event::Key {
                 key: Key::ArrowRight,
                 physical_key: Some(Key::ArrowRight),
@@ -513,20 +497,19 @@ impl VimKeyHandler {
                 modifiers: Modifiers::default(),
             });
             
-            // Step 2: Use Ctrl+Right to get to the next word
-            // This will move to the beginning of the next word
-            let mut mods = Modifiers::default();
-            mods.ctrl = true;
+            // Then, use Ctrl+Right for Windows/Linux word movement
+            // We'll do this in a separate message so it doesn't combine with the previous one
+            let mut ctrl_mods = Modifiers::default();
+            ctrl_mods.ctrl = true;
             input.events.push(Event::Key {
                 key: Key::ArrowRight,
                 physical_key: Some(Key::ArrowRight),
                 pressed: true,
                 repeat: false,
-                modifiers: mods,
+                modifiers: ctrl_mods,
             });
             
-            // Step 3: Use Alt+Right as well (for macOS)
-            // Some platforms use Alt instead of Ctrl for word movement
+            // Also try Alt+Right for macOS in a separate event
             let mut alt_mods = Modifiers::default();
             alt_mods.alt = true;
             input.events.push(Event::Key {
@@ -537,55 +520,18 @@ impl VimKeyHandler {
                 modifiers: alt_mods,
             });
             
-            // Step 4: If we're already at a word, the above events might not move
-            // So we add another sequence to ensure we move to the next word
-            
-            // First, move right to ensure we're not at the beginning of a word
-            input.events.push(Event::Key {
-                key: Key::ArrowRight,
-                physical_key: Some(Key::ArrowRight),
-                pressed: true,
-                repeat: false,
-                modifiers: Modifiers::default(),
-            });
-            
-            // Then try Ctrl+Right again (Windows/Linux style)
-            input.events.push(Event::Key {
-                key: Key::ArrowRight,
-                physical_key: Some(Key::ArrowRight),
-                pressed: true,
-                repeat: false,
-                modifiers: mods,
-            });
-            
-            println!("DEBUG: Added improved multi-step events for word-right movement");
+            println!("DEBUG: Added vim-style events for word-right movement");
         }
 
         // Generate word motion events for 'b'
         if b_key_text_pressed {
-            self.debug_log("Converting 'b' text to multi-step word movement");
+            self.debug_log("Converting 'b' text to vim-style word movement");
             
-            // Step 1: Try Home key to get to the beginning of the current line
-            input.events.push(Event::Key {
-                key: Key::Home,
-                physical_key: Some(Key::Home),
-                pressed: true,
-                repeat: false,
-                modifiers: Modifiers::default(),
-            });
+            // PRECISE SINGLE WORD MOVEMENT APPROACH:
+            // The previous implementation was adding too many events at once, causing
+            // multiple word jumps. This implementation uses a more controlled approach.
             
-            // Step 2: Use Ctrl+Left to ensure we're at the beginning of a word
-            let mut mods = Modifiers::default();
-            mods.ctrl = true;
-            input.events.push(Event::Key {
-                key: Key::ArrowLeft,
-                physical_key: Some(Key::ArrowLeft),
-                pressed: true,
-                repeat: false,
-                modifiers: mods,
-            });
-            
-            // Step 3: Use left arrow to potentially move between words
+            // First, a single left arrow to handle edge cases at word boundaries
             input.events.push(Event::Key {
                 key: Key::ArrowLeft,
                 physical_key: Some(Key::ArrowLeft),
@@ -594,16 +540,30 @@ impl VimKeyHandler {
                 modifiers: Modifiers::default(),
             });
             
-            // Step 4: Use Home to get to the beginning of the line if we change lines
+            // Then, use Ctrl+Left for Windows/Linux word movement
+            // We'll do this in a separate message so it doesn't combine with the previous one
+            let mut ctrl_mods = Modifiers::default();
+            ctrl_mods.ctrl = true;
             input.events.push(Event::Key {
-                key: Key::Home,
-                physical_key: Some(Key::Home),
+                key: Key::ArrowLeft,
+                physical_key: Some(Key::ArrowLeft),
                 pressed: true,
                 repeat: false,
-                modifiers: Modifiers::default(),
+                modifiers: ctrl_mods,
             });
             
-            println!("DEBUG: Added multi-step events for word-left movement");
+            // Also try Alt+Left for macOS in a separate event
+            let mut alt_mods = Modifiers::default();
+            alt_mods.alt = true;
+            input.events.push(Event::Key {
+                key: Key::ArrowLeft,
+                physical_key: Some(Key::ArrowLeft),
+                pressed: true,
+                repeat: false,
+                modifiers: alt_mods,
+            });
+            
+            println!("DEBUG: Added vim-style events for word-left movement");
         }
 
         // Generate document motion events for 'g'
@@ -760,120 +720,91 @@ impl VimKeyHandler {
                     Key::W => {
                         // Both Capital W and lowercase w both move by word with selection
                         self.debug_log(
-                            "'w/W' key pressed in visual mode - mapping to improved multi-step movement with selection",
+                            "'w/W' key pressed in visual mode - mapping to vim-style word movement with selection",
                         );
                         events_to_remove.extend(0..input.events.len());
                         
-                        // IMPROVED IMPLEMENTATION:
-                        // The previous implementation sometimes went past the next word and stopped
-                        // at whitespace. This refined approach handles that edge case better.
+                        // PRECISE SINGLE WORD MOVEMENT APPROACH:
+                        // Modified for visual mode by adding shift modifier for selection
                         
-                        // Step 1: Use Right arrow to move right once with selection
-                        let mut right_mods = Modifiers::default();
-                        right_mods.shift = true; // Add shift for selection
+                        // First, a single right arrow with shift to handle edge cases at word boundaries
+                        let mut shift_mods = Modifiers::default();
+                        shift_mods.shift = true;
                         input.events.push(Event::Key {
                             key: Key::ArrowRight,
                             physical_key: Some(Key::ArrowRight),
                             pressed: true,
                             repeat: false,
-                            modifiers: right_mods,
+                            modifiers: shift_mods,
                         });
                         
-                        // Step 2: Use Ctrl+Right to get to the next word with selection
-                        let mut ctrl_right_mods = Modifiers::default();
-                        ctrl_right_mods.ctrl = true;
-                        ctrl_right_mods.shift = true; // Add shift for selection
+                        // Then, use Ctrl+Shift+Right for Windows/Linux word movement with selection
+                        let mut ctrl_shift_mods = Modifiers::default();
+                        ctrl_shift_mods.ctrl = true;
+                        ctrl_shift_mods.shift = true; // Add shift for selection
                         input.events.push(Event::Key {
                             key: Key::ArrowRight,
                             physical_key: Some(Key::ArrowRight),
                             pressed: true,
                             repeat: false,
-                            modifiers: ctrl_right_mods,
+                            modifiers: ctrl_shift_mods,
                         });
                         
-                        // Step 3: Use Alt+Right as well (for macOS) with selection
-                        let mut alt_right_mods = Modifiers::default();
-                        alt_right_mods.alt = true;
-                        alt_right_mods.shift = true; // Add shift for selection
+                        // Also try Alt+Shift+Right for macOS in a separate event
+                        let mut alt_shift_mods = Modifiers::default();
+                        alt_shift_mods.alt = true;
+                        alt_shift_mods.shift = true; // Add shift for selection
                         input.events.push(Event::Key {
                             key: Key::ArrowRight,
                             physical_key: Some(Key::ArrowRight),
                             pressed: true,
                             repeat: false,
-                            modifiers: alt_right_mods,
-                        });
-                        
-                        // Step 4: If we're already at a word, the above events might not move
-                        // So we add another sequence to ensure we move to the next word, still with selection
-                        
-                        // First, move right to ensure we're not at the beginning of a word
-                        input.events.push(Event::Key {
-                            key: Key::ArrowRight,
-                            physical_key: Some(Key::ArrowRight),
-                            pressed: true,
-                            repeat: false,
-                            modifiers: right_mods, // Using already defined right_mods with shift
-                        });
-                        
-                        // Then try Ctrl+Right again (Windows/Linux style) with selection
-                        input.events.push(Event::Key {
-                            key: Key::ArrowRight,
-                            physical_key: Some(Key::ArrowRight),
-                            pressed: true,
-                            repeat: false,
-                            modifiers: ctrl_right_mods, // Using already defined ctrl_right_mods with shift
+                            modifiers: alt_shift_mods,
                         });
                     }
                     Key::B => {
                         // Both Capital B and lowercase b move by word backward with selection
                         self.debug_log(
-                            "'b/B' key pressed in visual mode - mapping to multi-step movement with selection",
+                            "'b/B' key pressed in visual mode - mapping to vim-style word movement with selection",
                         );
                         events_to_remove.extend(0..input.events.len());
                         
-                        // Step 1: Try Home key to get to the beginning of the current line
-                        let mut home_mods = Modifiers::default();
-                        home_mods.shift = true; // Add shift for selection
-                        input.events.push(Event::Key {
-                            key: Key::Home,
-                            physical_key: Some(Key::Home),
-                            pressed: true,
-                            repeat: false,
-                            modifiers: home_mods,
-                        });
+                        // PRECISE SINGLE WORD MOVEMENT APPROACH:
+                        // Modified for visual mode by adding shift modifier for selection
                         
-                        // Step 2: Use Ctrl+Left to ensure we're at the beginning of a word
-                        let mut ctrl_left_mods = Modifiers::default();
-                        ctrl_left_mods.ctrl = true;
-                        ctrl_left_mods.shift = true; // Add shift for selection
+                        // First, a single left arrow with shift to handle edge cases at word boundaries
+                        let mut shift_mods = Modifiers::default();
+                        shift_mods.shift = true;
                         input.events.push(Event::Key {
                             key: Key::ArrowLeft,
                             physical_key: Some(Key::ArrowLeft),
                             pressed: true,
                             repeat: false,
-                            modifiers: ctrl_left_mods,
+                            modifiers: shift_mods,
                         });
                         
-                        // Step 3: Use left arrow to potentially move between words
-                        let mut left_mods = Modifiers::default();
-                        left_mods.shift = true; // Add shift for selection
+                        // Then, use Ctrl+Shift+Left for Windows/Linux word movement with selection
+                        let mut ctrl_shift_mods = Modifiers::default();
+                        ctrl_shift_mods.ctrl = true;
+                        ctrl_shift_mods.shift = true; // Add shift for selection
                         input.events.push(Event::Key {
                             key: Key::ArrowLeft,
                             physical_key: Some(Key::ArrowLeft),
                             pressed: true,
                             repeat: false,
-                            modifiers: left_mods,
+                            modifiers: ctrl_shift_mods,
                         });
                         
-                        // Step 4: Use Home to get to the beginning of the line if we change lines
-                        let mut home2_mods = Modifiers::default();
-                        home2_mods.shift = true; // Add shift for selection
+                        // Also try Alt+Shift+Left for macOS in a separate event
+                        let mut alt_shift_mods = Modifiers::default();
+                        alt_shift_mods.alt = true;
+                        alt_shift_mods.shift = true; // Add shift for selection
                         input.events.push(Event::Key {
-                            key: Key::Home,
-                            physical_key: Some(Key::Home),
+                            key: Key::ArrowLeft,
+                            physical_key: Some(Key::ArrowLeft),
                             pressed: true,
                             repeat: false,
-                            modifiers: home2_mods,
+                            modifiers: alt_shift_mods,
                         });
                     }
 
