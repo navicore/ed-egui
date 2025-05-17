@@ -78,6 +78,7 @@ impl TextBuffer {
     // Move cursor right
     pub fn move_cursor_right(&mut self) {
         if self.cursor_pos < self.text.len() {
+            // Move cursor right one character
             self.cursor_pos += 1;
         }
     }
@@ -157,24 +158,36 @@ impl TextBuffer {
     pub fn move_cursor_to(&mut self, line: usize, column: usize) {
         self.update_line_positions();
 
+        // Handle empty buffer
+        if self.text.is_empty() {
+            self.cursor_pos = 0;
+            return;
+        }
+
         // Clamp line to valid range
         let line = line.min(self.line_positions.len() - 1);
 
         // Get line start position
         let line_start = self.line_positions[line];
 
-        // Get line end position
+        // Calculate line end position precisely to respect line endings
         let line_end = if line < self.line_positions.len() - 1 {
-            self.line_positions[line + 1] - 1 // -1 to account for the newline
+            // End position is the next line's start minus 1 (for the newline)
+            self.line_positions[line + 1] - 1
         } else {
+            // For the last line, end is simply the text length
             self.text.len()
         };
 
-        // Calculate max column position for this line
-        let max_column = line_end - line_start;
+        // Calculate max column position for this line (respecting line endings)
+        let line_text = &self.text[line_start..line_end];
+        let max_column = line_text.len();
 
+        // Clamp column to line boundaries
+        let column = column.min(max_column);
+        
         // Set cursor position to line start + column (clamped to line length)
-        self.cursor_pos = line_start + column.min(max_column);
+        self.cursor_pos = line_start + column;
     }
 
     // Move cursor up one line, trying to maintain the same column position

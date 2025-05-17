@@ -5,3 +5,4 @@ Cargo.lock
 /src/egui
 /src/egui_code_editor
 /reference
+/egui
