@@ -25,7 +25,11 @@ name = "minimal"
 required-features = ["eframe-demo"]
 
 [[example]]
-name = "basic_editor"
+name = "vim_editor"
+required-features = ["eframe-demo"]
+
+[[example]]
+name = "emacs_editor"
 required-features = ["eframe-demo"]
 
 [dev-dependencies]

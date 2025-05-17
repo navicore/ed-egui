@@ -92,10 +92,15 @@ fix:
 	$(CLIPPY) --fix --allow-dirty --allow-staged
 
 # Run examples
-.PHONY: run-basic
-run-basic:
-	@echo "Running basic editor example..."
-	$(CARGO) run --example basic_editor --features eframe-demo
+.PHONY: run-vim-editor
+run-vim-editor:
+	@echo "Running vim editor example..."
+	$(CARGO) run --example vim_editor --features eframe-demo
+
+.PHONY: run-emacs-editor
+run-emacs-editor:
+	@echo "Running emacs editor example..."
+	$(CARGO) run --example emacs_editor --features eframe-demo
 
 .PHONY: run-minimal
 run-minimal:

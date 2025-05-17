@@ -185,7 +185,7 @@ impl TextBuffer {
 
         // Clamp column to line boundaries
         let column = column.min(max_column);
-        
+
         // Set cursor position to line start + column (clamped to line length)
         self.cursor_pos = line_start + column;
     }
@@ -255,7 +255,7 @@ impl TextBuffer {
     }
 
     // Move cursor to the beginning of the buffer
-    pub fn move_cursor_document_start(&mut self) {
+    pub const fn move_cursor_document_start(&mut self) {
         self.cursor_pos = 0;
     }
 

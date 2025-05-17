@@ -25,54 +25,59 @@ A flexible code editor widget for egui with Vim and Emacs key bindings.
 ### Basic Usage
 
 ```rust
-use ed_egui::{EditorWidget, EditingMode};
+use ed_egui::EditorWidget;
 
 // Create an editor with default settings (Emacs mode)
 let mut editor = EditorWidget::default();
 
 // Show the editor in an egui UI
-ui.add(&mut editor);
+editor.show(ui);
 ```
 
 ### With Vim Keybindings
 
 ```rust
-use ed_egui::{EditorWidget, EditingMode};
+use ed_egui::{EditorWidget, EditorMode, VimMode};
 
 // Create an editor with Vim mode
 let mut editor = EditorWidget::default()
-    .with_mode(ed_egui::modes::EditingModeType::Vim);
+    .with_mode(EditorMode::Vim(VimMode::Normal));
 
 // Show the editor in an egui UI
-ui.add(&mut editor);
+editor.show(ui);
 ```
 
-### With Syntax Highlighting
+### With Font Size and Status Bar
 
 ```rust
-use ed_egui::{EditorWidget, EditingMode};
-use ed_egui::syntax::MarkdownHighlighter;
+use ed_egui::EditorWidget;
 
-// Create an editor with syntax highlighting
-let mut editor = EditorWidget::default()
-    .with_syntax_highlighter(MarkdownHighlighter::new());
+// Create an editor with custom font size and status bar
+let mut editor = EditorWidget::new("my_editor")
+    .with_font_size(16.0)
+    .with_status_bar(true);
+
+// Set initial content
+editor.set_text("Hello, ed-egui!");
 
 // Show the editor in an egui UI
-ui.add(&mut editor);
+editor.show(ui);
 ```
 
 ## Examples
 
-The crate comes with several examples:
+The crate comes with focused examples to demonstrate different usage scenarios:
 
-1. `simple_editor` - A basic editor with both Vim and Emacs modes
-2. `markdown_editor` - A markdown editor with syntax highlighting and preview
+1. `minimal` - A minimal example showing basic editor integration
+2. `vim_editor` - A dedicated editor using Vim keybindings only
+3. `emacs_editor` - A dedicated editor using Emacs keybindings only
 
 Run them with:
 
 ```bash
-cargo run --example simple_editor --features eframe-demo
-cargo run --example markdown_editor --features eframe-demo
+cargo run --example minimal
+cargo run --example vim_editor
+cargo run --example emacs_editor
 ```
 
 ## Vim Mode Features
@@ -80,19 +85,22 @@ cargo run --example markdown_editor --features eframe-demo
 The Vim mode implementation supports:
 
 - Modal editing (Normal, Insert, Visual)
-- Movement commands (h, j, k, l, w, b, 0, $)
-- Operators (d, c, y) with motions
-- Counts (e.g., 5j to move down 5 lines)
-- Text objects (coming soon)
+- Movement commands (h, j, k, l, w, b, 0, $, g, G)
+- Visual mode selections with v
+- Visual mode operations (y for copy, d/x for cut, c for change)
+- Delete with x in normal mode
 
 ## Emacs Mode Features
 
 The Emacs mode implementation supports:
 
-- Chord-based key bindings (C-x C-s, etc.)
-- Navigation commands (C-f, C-b, C-p, C-n, C-a, C-e)
-- Mark and region operations
-- Kill and yank (cut and paste)
+- Standard Emacs navigation commands
+  - Ctrl+F/B - Move cursor right/left
+  - Ctrl+P/N - Move cursor up/down
+  - Ctrl+A/E - Move to start/end of line
+  - Alt+F/B - Word movement
+  - Alt+< / Alt+> - Document start/end
+- Works alongside standard system keyboard shortcuts for editing
 
 ## Project Status
 
@@ -109,18 +117,28 @@ at your option.
 
 ## Bevy Integration
 
-This crate works with bevy_egui out of the box. Simply use the `bevy` feature to enable bevy_egui support:
+This crate works with bevy_egui out of the box. Simply add both dependencies to your Bevy project:
 
-```rust
-ed-egui = { version = "0.1", features = ["bevy"] }
+```toml
+[dependencies]
+bevy = "0.12"
+bevy_egui = "0.23"
+ed-egui = "0.1"
 ```
 
 Then use the editor widget in your bevy_egui UI code:
 
 ```rust
-fn ui_system(mut egui_context: ResMut<EguiContext>) {
-    egui::Window::new("Editor").show(egui_context.ctx_mut(), |ui| {
-        let mut editor = EditorWidget::default();
+use bevy::prelude::*;
+use bevy_egui::{egui, EguiContexts};
+use ed_egui::{EditorWidget, EditorMode, VimMode};
+
+fn ui_system(mut contexts: EguiContexts) {
+    egui::Window::new("Editor").show(contexts.ctx_mut(), |ui| {
+        let mut editor = EditorWidget::new("bevy_editor")
+            .with_mode(EditorMode::Vim(VimMode::Normal))
+            .with_status_bar(true);
+            
         editor.show(ui);
     });
 }

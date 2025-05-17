@@ -1,63 +1,42 @@
+//! Minimal example showing basic integration of the ed-egui widget
+//! 
+//! This example demonstrates the absolute minimum code needed to use the editor
+//! without focusing on any specific keybinding mode. For examples that focus on
+//! a specific editing mode, see:
+//! - vim_editor.rs - For Vim keybindings
+//! - emacs_editor.rs - For Emacs keybindings
+
+use ed_egui::EditorWidget;
 use eframe::egui;
 
-#[allow(dead_code)]
 struct MinimalEditorApp {
-    text: String,
-    cursor_pos: usize,
+    editor: EditorWidget,
 }
 
 impl Default for MinimalEditorApp {
     fn default() -> Self {
-        Self {
-            text: "Hello, ed-egui!".to_string(),
-            cursor_pos: 0,
-        }
+        // Create a new editor with some basic settings
+        let mut editor = EditorWidget::new("minimal")
+            .with_font_size(14.0)
+            .with_status_bar(true);
+
+        // Set initial text content
+        editor.set_text("Hello, ed-egui!\n\nThis is the minimal example.\n\nBy default, this uses Emacs keybindings.\nTo use Vim mode, see the vim_editor.rs example.");
+
+        Self { editor }
     }
 }
 
 impl eframe::App for MinimalEditorApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
-            ui.heading("Minimal Editor Test");
-            ui.label("This is a basic test of the editor integration with egui.");
-
-            // Use egui's built-in TextEdit while we develop our own editor
-            let response = ui.add(
-                egui::TextEdit::multiline(&mut self.text)
-                    .desired_width(f32::INFINITY)
-                    .desired_rows(10)
-                    .font(egui::TextStyle::Monospace),
-            );
-
-            // Display editor state for debugging
+            ui.heading("Minimal Editor Example");
+            ui.label("The simplest possible integration of ed-egui with an egui app.");
+            
             ui.separator();
-            ui.horizontal(|ui| {
-                ui.label("Text length:");
-                ui.label(format!("{}", self.text.len()));
-
-                if response.has_focus() {
-                    ui.label("Editor has focus");
-                }
-            });
-
-            // Display information about key presses
-            if response.has_focus() {
-                ui.separator();
-                ui.label("Key presses:");
-
-                let input = ui.input(|i| i.clone());
-                for key in &input.keys_down {
-                    if input.key_pressed(*key) {
-                        ui.label(format!("Key pressed: {:?}", key));
-                    }
-                }
-
-                for event in &input.events {
-                    if let egui::Event::Text(text) = event {
-                        ui.label(format!("Text entered: {:?}", text));
-                    }
-                }
-            }
+            
+            // Just show the editor - that's it!
+            self.editor.show(ui);
         });
     }
 }
@@ -65,7 +44,7 @@ impl eframe::App for MinimalEditorApp {
 fn main() -> eframe::Result<()> {
     let native_options = eframe::NativeOptions::default();
     eframe::run_native(
-        "Minimal Ed-Egui Test",
+        "Minimal Ed-Egui Example",
         native_options,
         Box::new(|_cc| Box::new(MinimalEditorApp::default())),
     )
