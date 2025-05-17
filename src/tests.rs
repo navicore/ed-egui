@@ -116,24 +116,7 @@ mod buffer_tests {
         assert!(buffer.cursor_position() >= 9); // Should be at least past beginning of line 3
     }
 
-    #[test]
-    fn test_word_movement() {
-        let mut buffer = TextBuffer::new();
-        buffer.set_text("abc def ghi".to_string());
-
-        buffer.set_cursor_position(0);
-        buffer.move_cursor_word_right();
-        assert_eq!(buffer.cursor_position(), 4);
-
-        buffer.move_cursor_word_right();
-        assert_eq!(buffer.cursor_position(), 8);
-
-        buffer.move_cursor_word_left();
-        assert_eq!(buffer.cursor_position(), 4);
-
-        buffer.move_cursor_word_left();
-        assert_eq!(buffer.cursor_position(), 0);
-    }
+    // Word movement tests removed as functionality is now handled by TextEdit widget
 
     #[test]
     fn test_document_movement() {

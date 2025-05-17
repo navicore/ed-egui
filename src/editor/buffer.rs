@@ -68,41 +68,9 @@ impl TextBuffer {
         }
     }
 
-    // Move cursor left
-    pub const fn move_cursor_left(&mut self) {
-        if self.cursor_pos > 0 {
-            self.cursor_pos -= 1;
-        }
-    }
-
-    // Move cursor right
-    pub fn move_cursor_right(&mut self) {
-        if self.cursor_pos < self.text.len() {
-            // Move cursor right one character
-            self.cursor_pos += 1;
-        }
-    }
-
-    // Move to the start of the current line
-    pub fn move_to_line_start(&mut self) {
-        // Find the previous newline or start of text
-        while self.cursor_pos > 0 && !self.text[..self.cursor_pos].ends_with('\n') {
-            self.cursor_pos -= 1;
-        }
-
-        // If we stopped at a newline, move past it
-        if self.cursor_pos > 0 && self.text[..self.cursor_pos].ends_with('\n') {
-            self.cursor_pos += 1;
-        }
-    }
-
-    // Move to the end of the current line
-    pub fn move_to_line_end(&mut self) {
-        // Find the next newline or end of text
-        while self.cursor_pos < self.text.len() && self.text.as_bytes()[self.cursor_pos] != b'\n' {
-            self.cursor_pos += 1;
-        }
-    }
+    // NOTE: All cursor movement functionality has been removed and is now
+    // handled directly by the TextEdit widget. The cursor_pos field in this
+    // struct is only updated from the TextEdit widget's cursor position.
 
     // Insert a newline at the cursor position
     pub fn insert_newline(&mut self) {
@@ -154,113 +122,10 @@ impl TextBuffer {
         self.line_positions.len()
     }
 
-    /// Move cursor to a specific line and column
-    pub fn move_cursor_to(&mut self, line: usize, column: usize) {
-        self.update_line_positions();
+    // Line and column information functions are still useful for status bar display
+    // but no longer directly manipulate the cursor position
 
-        // Handle empty buffer
-        if self.text.is_empty() {
-            self.cursor_pos = 0;
-            return;
-        }
-
-        // Clamp line to valid range
-        let line = line.min(self.line_positions.len() - 1);
-
-        // Get line start position
-        let line_start = self.line_positions[line];
-
-        // Calculate line end position precisely to respect line endings
-        let line_end = if line < self.line_positions.len() - 1 {
-            // End position is the next line's start minus 1 (for the newline)
-            self.line_positions[line + 1] - 1
-        } else {
-            // For the last line, end is simply the text length
-            self.text.len()
-        };
-
-        // Calculate max column position for this line (respecting line endings)
-        let line_text = &self.text[line_start..line_end];
-        let max_column = line_text.len();
-
-        // Clamp column to line boundaries
-        let column = column.min(max_column);
-
-        // Set cursor position to line start + column (clamped to line length)
-        self.cursor_pos = line_start + column;
-    }
-
-    // Move cursor up one line, trying to maintain the same column position
-    pub fn move_cursor_up(&mut self) {
-        self.update_line_positions();
-        let current_line = self.current_line();
-
-        if current_line > 0 {
-            let current_column = self.current_column();
-            self.move_cursor_to(current_line - 1, current_column);
-        }
-    }
-
-    // Move cursor down one line, trying to maintain the same column position
-    pub fn move_cursor_down(&mut self) {
-        self.update_line_positions();
-        let current_line = self.current_line();
-
-        if current_line < self.line_count() - 1 {
-            let current_column = self.current_column();
-            self.move_cursor_to(current_line + 1, current_column);
-        }
-    }
-
-    // Move cursor to the beginning of the word or the previous word
-    pub fn move_cursor_word_left(&mut self) {
-        if self.cursor_pos == 0 {
-            return;
-        }
-
-        // First, skip any whitespace to the left
-        while self.cursor_pos > 0
-            && self.text[self.cursor_pos - 1..].starts_with(|c: char| c.is_whitespace())
-        {
-            self.cursor_pos -= 1;
-        }
-
-        // Then, move to the beginning of the current word
-        while self.cursor_pos > 0
-            && !self.text[self.cursor_pos - 1..].starts_with(|c: char| c.is_whitespace())
-        {
-            self.cursor_pos -= 1;
-        }
-    }
-
-    // Move cursor to the beginning of the next word
-    pub fn move_cursor_word_right(&mut self) {
-        if self.cursor_pos >= self.text.len() {
-            return;
-        }
-
-        // First, move to the end of the current word
-        while self.cursor_pos < self.text.len()
-            && !self.text[self.cursor_pos..].starts_with(|c: char| c.is_whitespace())
-        {
-            self.cursor_pos += 1;
-        }
-
-        // Then, skip any whitespace
-        while self.cursor_pos < self.text.len()
-            && self.text[self.cursor_pos..].starts_with(|c: char| c.is_whitespace())
-        {
-            self.cursor_pos += 1;
-        }
-    }
-
-    // Move cursor to the beginning of the buffer
-    pub const fn move_cursor_document_start(&mut self) {
-        self.cursor_pos = 0;
-    }
-
-    // Move cursor to the end of the buffer
-    pub fn move_cursor_document_end(&mut self) {
-        self.cursor_pos = self.text.len();
-    }
+    // NOTE: All cursor movement functionality has been removed and is now
+    // handled directly by the TextEdit widget. The cursor_pos field in this
+    // struct is only updated from the TextEdit widget's cursor position.
 }
