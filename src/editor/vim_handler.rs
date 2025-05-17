@@ -23,7 +23,6 @@ impl VimKeyHandler {
     pub fn new() -> Self {
         Self::default()
     }
-    
 
     #[must_use]
     pub const fn with_debug(mut self, debug: bool) -> Self {
@@ -47,87 +46,77 @@ impl VimKeyHandler {
         }
     }
 
-    /// Helper method to generate key events for document navigation
-    /// 
-    /// This creates multiple key events that will trigger document start/end movement in TextEdit.
-    /// We generate multiple combinations since different platforms use different shortcuts:
-    /// - Windows/Linux typically use Ctrl+Home/End
-    /// - macOS might use Command+Up/Down, Command+Home/End or other combinations
     fn gen_doc_navigation_events(&self, is_end: bool, with_selection: bool) -> Vec<Event> {
         let mut events = Vec::new();
-        
-        // Create Home/End events with Ctrl modifier (Windows/Linux)
+
         {
             let key = if is_end { Key::End } else { Key::Home };
-            let physical_key = if is_end {
-                Some(Key::End)
-            } else {
-                Some(Key::Home)
+
+            let mut mods = Modifiers {
+                alt: core::default::Default::default(),
+                ctrl: core::default::Default::default(),
+                shift: core::default::Default::default(),
+                mac_cmd: core::default::Default::default(),
+                command: core::default::Default::default(),
             };
-            
-            let mut mods = Modifiers::default();
             mods.ctrl = true;
             mods.shift = with_selection; // Add shift if we want selection
             mods.alt = false;
             mods.command = false;
-            
+
             events.push(Event::Key {
                 key,
-                physical_key,
-                pressed: true,
+                physical_key: None,
+                pressed: false,
                 repeat: false,
                 modifiers: mods,
             });
         }
-        
-        // Create Home/End events with Command modifier (macOS)
+
         {
             let key = if is_end { Key::End } else { Key::Home };
-            let physical_key = if is_end {
-                Some(Key::End)
-            } else {
-                Some(Key::Home)
+
+            let mut mods = Modifiers {
+                alt: core::default::Default::default(),
+                ctrl: core::default::Default::default(),
+                shift: core::default::Default::default(),
+                mac_cmd: core::default::Default::default(),
+                command: core::default::Default::default(),
             };
-            
-            let mut mods = Modifiers::default();
             mods.command = true;
             mods.shift = with_selection; // Add shift if we want selection
-            mods.alt = false;
-            mods.ctrl = false;
-            
+
             events.push(Event::Key {
                 key,
-                physical_key,
-                pressed: true,
+                physical_key: None,
+                pressed: false,
                 repeat: false,
                 modifiers: mods,
             });
         }
-        
-        // Create Up/Down events with Command modifier (macOS alternative)
+
         {
             let key = if is_end { Key::ArrowDown } else { Key::ArrowUp };
-            let physical_key = if is_end {
-                Some(Key::ArrowDown)
-            } else {
-                Some(Key::ArrowUp)
+
+            let mut mods = Modifiers {
+                alt: core::default::Default::default(),
+                ctrl: core::default::Default::default(),
+                shift: core::default::Default::default(),
+                mac_cmd: core::default::Default::default(),
+                command: core::default::Default::default(),
             };
-            
-            let mut mods = Modifiers::default();
             mods.command = true;
             mods.shift = with_selection; // Add shift if we want selection
-            mods.alt = false;
-            mods.ctrl = false;
-            
+
             events.push(Event::Key {
                 key,
-                physical_key,
+                physical_key: None,
                 pressed: true,
                 repeat: false,
                 modifiers: mods,
             });
         }
-        
+
         // Try plain Home/End without modifiers as a fallback
         // Some applications treat Home/End differently than Ctrl+Home/End
         if is_end {
@@ -135,13 +124,19 @@ impl VimKeyHandler {
             events.push(Event::Key {
                 key: Key::End,
                 physical_key: Some(Key::End),
-                pressed: true, 
+                pressed: true,
                 repeat: false,
                 modifiers: Modifiers::default(),
             });
-            
+
             // Also try PageDown key with Control modifier as another option
-            let mut mods = Modifiers::default();
+            let mut mods = Modifiers {
+                alt: core::default::Default::default(),
+                ctrl: core::default::Default::default(),
+                shift: core::default::Default::default(),
+                mac_cmd: core::default::Default::default(),
+                command: core::default::Default::default(),
+            };
             mods.ctrl = true;
             events.push(Event::Key {
                 key: Key::PageDown,
@@ -151,8 +146,12 @@ impl VimKeyHandler {
                 modifiers: mods,
             });
         }
-        
-        println!("DEBUG: Generated {} document navigation events (selection: {})", events.len(), with_selection);
+
+        println!(
+            "DEBUG: Generated {} document navigation events (selection: {})",
+            events.len(),
+            with_selection
+        );
         events
     }
 
@@ -264,16 +263,16 @@ impl VimKeyHandler {
                         self.debug_log("'w/W' key pressed - mapping to vim-style word movement");
                         println!("DEBUG: Processing W key in normal mode");
                         events_to_remove.extend(0..input.events.len());
-                        
+
                         // PRECISE SINGLE WORD MOVEMENT APPROACH:
                         // The previous implementation was adding too many events at once, causing
                         // multiple word jumps. This implementation uses a more controlled approach
                         // that ensures we move exactly one word at a time.
-                        
+
                         // We'll use two separate approaches and let the platform choose which works:
                         // 1. For Windows/Linux: Use a simple Right arrow + Ctrl+Right sequence
                         // 2. For macOS: Use a Right arrow + Alt+Right sequence
-                        
+
                         // First, a single right arrow to handle edge cases at word boundaries
                         input.events.push(Event::Key {
                             key: Key::ArrowRight,
@@ -282,10 +281,16 @@ impl VimKeyHandler {
                             repeat: false,
                             modifiers: Modifiers::default(),
                         });
-                        
+
                         // Then, use Ctrl+Right for Windows/Linux word movement
                         // We'll do this in a separate message so it doesn't combine with the previous one
-                        let mut ctrl_mods = Modifiers::default();
+                        let mut ctrl_mods = Modifiers {
+                            alt: core::default::Default::default(),
+                            ctrl: core::default::Default::default(),
+                            shift: core::default::Default::default(),
+                            mac_cmd: core::default::Default::default(),
+                            command: core::default::Default::default(),
+                        };
                         ctrl_mods.ctrl = true;
                         input.events.push(Event::Key {
                             key: Key::ArrowRight,
@@ -294,9 +299,15 @@ impl VimKeyHandler {
                             repeat: false,
                             modifiers: ctrl_mods,
                         });
-                        
+
                         // Also try Alt+Right for macOS in a separate event
-                        let mut alt_mods = Modifiers::default();
+                        let mut alt_mods = Modifiers {
+                            alt: core::default::Default::default(),
+                            ctrl: core::default::Default::default(),
+                            shift: core::default::Default::default(),
+                            mac_cmd: core::default::Default::default(),
+                            command: core::default::Default::default(),
+                        };
                         alt_mods.alt = true;
                         input.events.push(Event::Key {
                             key: Key::ArrowRight,
@@ -311,16 +322,16 @@ impl VimKeyHandler {
                         self.debug_log("'b/B' key pressed - mapping to vim-style word movement");
                         println!("DEBUG: Processing B key in normal mode");
                         events_to_remove.extend(0..input.events.len());
-                        
+
                         // PRECISE SINGLE WORD MOVEMENT APPROACH:
                         // The previous implementation was adding too many events at once, causing
                         // multiple word jumps. This implementation uses a more controlled approach
                         // that ensures we move exactly one word at a time.
-                        
+
                         // We'll use two separate approaches and let the platform choose which works:
                         // 1. For Windows/Linux: Use a simple Left arrow + Ctrl+Left sequence
                         // 2. For macOS: Use a Left arrow + Alt+Left sequence
-                        
+
                         // First, a single left arrow to handle edge cases at word boundaries
                         input.events.push(Event::Key {
                             key: Key::ArrowLeft,
@@ -329,10 +340,16 @@ impl VimKeyHandler {
                             repeat: false,
                             modifiers: Modifiers::default(),
                         });
-                        
+
                         // Then, use Ctrl+Left for Windows/Linux word movement
                         // We'll do this in a separate message so it doesn't combine with the previous one
-                        let mut ctrl_mods = Modifiers::default();
+                        let mut ctrl_mods = Modifiers {
+                            alt: core::default::Default::default(),
+                            ctrl: core::default::Default::default(),
+                            shift: core::default::Default::default(),
+                            mac_cmd: core::default::Default::default(),
+                            command: core::default::Default::default(),
+                        };
                         ctrl_mods.ctrl = true;
                         input.events.push(Event::Key {
                             key: Key::ArrowLeft,
@@ -341,9 +358,15 @@ impl VimKeyHandler {
                             repeat: false,
                             modifiers: ctrl_mods,
                         });
-                        
+
                         // Also try Alt+Left for macOS in a separate event
-                        let mut alt_mods = Modifiers::default();
+                        let mut alt_mods = Modifiers {
+                            alt: core::default::Default::default(),
+                            ctrl: core::default::Default::default(),
+                            shift: core::default::Default::default(),
+                            mac_cmd: core::default::Default::default(),
+                            command: core::default::Default::default(),
+                        };
                         alt_mods.alt = true;
                         input.events.push(Event::Key {
                             key: Key::ArrowLeft,
@@ -390,8 +413,11 @@ impl VimKeyHandler {
 
                             // Generate document end navigation events
                             let events = self.gen_doc_navigation_events(true, false);
-                            println!("DEBUG: Generated {} events for document-end movement", events.len());
-                            
+                            println!(
+                                "DEBUG: Generated {} events for document-end movement",
+                                events.len()
+                            );
+
                             // Add all generated events to the input queue
                             for event in events {
                                 println!("DEBUG: Adding document-end event: {:?}", event);
@@ -403,8 +429,11 @@ impl VimKeyHandler {
 
                             // Generate document start navigation events
                             let events = self.gen_doc_navigation_events(false, false);
-                            println!("DEBUG: Generated {} events for document-start movement", events.len());
-                            
+                            println!(
+                                "DEBUG: Generated {} events for document-start movement",
+                                events.len()
+                            );
+
                             // Add all generated events to the input queue
                             for event in events {
                                 println!("DEBUG: Adding document-start event: {:?}", event);
@@ -483,11 +512,11 @@ impl VimKeyHandler {
         // Generate word motion events for 'w'
         if w_key_text_pressed {
             self.debug_log("Converting 'w' text to vim-style word movement");
-            
+
             // PRECISE SINGLE WORD MOVEMENT APPROACH:
             // The previous implementation was adding too many events at once, causing
             // multiple word jumps. This implementation uses a more controlled approach.
-            
+
             // First, a single right arrow to handle edge cases at word boundaries
             input.events.push(Event::Key {
                 key: Key::ArrowRight,
@@ -496,10 +525,16 @@ impl VimKeyHandler {
                 repeat: false,
                 modifiers: Modifiers::default(),
             });
-            
+
             // Then, use Ctrl+Right for Windows/Linux word movement
             // We'll do this in a separate message so it doesn't combine with the previous one
-            let mut ctrl_mods = Modifiers::default();
+            let mut ctrl_mods = Modifiers {
+                alt: core::default::Default::default(),
+                ctrl: core::default::Default::default(),
+                shift: core::default::Default::default(),
+                mac_cmd: core::default::Default::default(),
+                command: core::default::Default::default(),
+            };
             ctrl_mods.ctrl = true;
             input.events.push(Event::Key {
                 key: Key::ArrowRight,
@@ -508,9 +543,15 @@ impl VimKeyHandler {
                 repeat: false,
                 modifiers: ctrl_mods,
             });
-            
+
             // Also try Alt+Right for macOS in a separate event
-            let mut alt_mods = Modifiers::default();
+            let mut alt_mods = Modifiers {
+                alt: core::default::Default::default(),
+                ctrl: core::default::Default::default(),
+                shift: core::default::Default::default(),
+                mac_cmd: core::default::Default::default(),
+                command: core::default::Default::default(),
+            };
             alt_mods.alt = true;
             input.events.push(Event::Key {
                 key: Key::ArrowRight,
@@ -519,18 +560,18 @@ impl VimKeyHandler {
                 repeat: false,
                 modifiers: alt_mods,
             });
-            
+
             println!("DEBUG: Added vim-style events for word-right movement");
         }
 
         // Generate word motion events for 'b'
         if b_key_text_pressed {
             self.debug_log("Converting 'b' text to vim-style word movement");
-            
+
             // PRECISE SINGLE WORD MOVEMENT APPROACH:
             // The previous implementation was adding too many events at once, causing
             // multiple word jumps. This implementation uses a more controlled approach.
-            
+
             // First, a single left arrow to handle edge cases at word boundaries
             input.events.push(Event::Key {
                 key: Key::ArrowLeft,
@@ -539,10 +580,16 @@ impl VimKeyHandler {
                 repeat: false,
                 modifiers: Modifiers::default(),
             });
-            
+
             // Then, use Ctrl+Left for Windows/Linux word movement
             // We'll do this in a separate message so it doesn't combine with the previous one
-            let mut ctrl_mods = Modifiers::default();
+            let mut ctrl_mods = Modifiers {
+                alt: core::default::Default::default(),
+                ctrl: core::default::Default::default(),
+                shift: core::default::Default::default(),
+                mac_cmd: core::default::Default::default(),
+                command: core::default::Default::default(),
+            };
             ctrl_mods.ctrl = true;
             input.events.push(Event::Key {
                 key: Key::ArrowLeft,
@@ -551,9 +598,15 @@ impl VimKeyHandler {
                 repeat: false,
                 modifiers: ctrl_mods,
             });
-            
+
             // Also try Alt+Left for macOS in a separate event
-            let mut alt_mods = Modifiers::default();
+            let mut alt_mods = Modifiers {
+                alt: core::default::Default::default(),
+                ctrl: core::default::Default::default(),
+                shift: core::default::Default::default(),
+                mac_cmd: core::default::Default::default(),
+                command: core::default::Default::default(),
+            };
             alt_mods.alt = true;
             input.events.push(Event::Key {
                 key: Key::ArrowLeft,
@@ -562,7 +615,7 @@ impl VimKeyHandler {
                 repeat: false,
                 modifiers: alt_mods,
             });
-            
+
             println!("DEBUG: Added vim-style events for word-left movement");
         }
 
@@ -570,8 +623,11 @@ impl VimKeyHandler {
         if g_key_text_pressed {
             self.debug_log("Converting 'g' text to document-start navigation events");
             let events = self.gen_doc_navigation_events(false, false);
-            println!("DEBUG: Generated {} events for document-start movement from text event", events.len());
-            
+            println!(
+                "DEBUG: Generated {} events for document-start movement from text event",
+                events.len()
+            );
+
             // Add all generated events to the input queue
             for event in events {
                 println!("DEBUG: Adding document-start event from text: {:?}", event);
@@ -583,8 +639,11 @@ impl VimKeyHandler {
         if shift_g_pressed {
             self.debug_log("Converting 'G' text to document-end navigation events");
             let events = self.gen_doc_navigation_events(true, false);
-            println!("DEBUG: Generated {} events for document-end movement from text event", events.len());
-            
+            println!(
+                "DEBUG: Generated {} events for document-end movement from text event",
+                events.len()
+            );
+
             // Add all generated events to the input queue
             for event in events {
                 println!("DEBUG: Adding document-end event from text: {:?}", event);
@@ -595,10 +654,10 @@ impl VimKeyHandler {
         // Generate line end motion for '$'
         if dollar_key_pressed {
             self.debug_log("Converting '$' to End key event");
-            
+
             // Create a clean modifier - we want no modifiers for End key
             let mods = Modifiers::default();
-            
+
             let event = Event::Key {
                 key: Key::End,
                 physical_key: Some(Key::End),
@@ -716,95 +775,30 @@ impl VimKeyHandler {
                         });
                     }
 
-                    // Word movement - map directly to word movement events with shift modifier for selection
                     Key::W => {
-                        // Both Capital W and lowercase w both move by word with selection
-                        self.debug_log(
-                            "'w/W' key pressed in visual mode - mapping to vim-style word movement with selection",
-                        );
                         events_to_remove.extend(0..input.events.len());
-                        
-                        // PRECISE SINGLE WORD MOVEMENT APPROACH:
-                        // Modified for visual mode by adding shift modifier for selection
-                        
-                        // First, a single right arrow with shift to handle edge cases at word boundaries
-                        let mut shift_mods = Modifiers::default();
-                        shift_mods.shift = true;
+
+                        let mut mods = input.modifiers;
+                        mods.ctrl = true;
                         input.events.push(Event::Key {
                             key: Key::ArrowRight,
-                            physical_key: Some(Key::ArrowRight),
-                            pressed: true,
+                            physical_key: None,
+                            pressed: false,
                             repeat: false,
-                            modifiers: shift_mods,
-                        });
-                        
-                        // Then, use Ctrl+Shift+Right for Windows/Linux word movement with selection
-                        let mut ctrl_shift_mods = Modifiers::default();
-                        ctrl_shift_mods.ctrl = true;
-                        ctrl_shift_mods.shift = true; // Add shift for selection
-                        input.events.push(Event::Key {
-                            key: Key::ArrowRight,
-                            physical_key: Some(Key::ArrowRight),
-                            pressed: true,
-                            repeat: false,
-                            modifiers: ctrl_shift_mods,
-                        });
-                        
-                        // Also try Alt+Shift+Right for macOS in a separate event
-                        let mut alt_shift_mods = Modifiers::default();
-                        alt_shift_mods.alt = true;
-                        alt_shift_mods.shift = true; // Add shift for selection
-                        input.events.push(Event::Key {
-                            key: Key::ArrowRight,
-                            physical_key: Some(Key::ArrowRight),
-                            pressed: true,
-                            repeat: false,
-                            modifiers: alt_shift_mods,
+                            modifiers: mods,
                         });
                     }
+
                     Key::B => {
-                        // Both Capital B and lowercase b move by word backward with selection
-                        self.debug_log(
-                            "'b/B' key pressed in visual mode - mapping to vim-style word movement with selection",
-                        );
                         events_to_remove.extend(0..input.events.len());
-                        
-                        // PRECISE SINGLE WORD MOVEMENT APPROACH:
-                        // Modified for visual mode by adding shift modifier for selection
-                        
-                        // First, a single left arrow with shift to handle edge cases at word boundaries
-                        let mut shift_mods = Modifiers::default();
-                        shift_mods.shift = true;
+                        let mut mods = input.modifiers;
+                        mods.ctrl = true;
                         input.events.push(Event::Key {
                             key: Key::ArrowLeft,
-                            physical_key: Some(Key::ArrowLeft),
-                            pressed: true,
+                            physical_key: None,
+                            pressed: false,
                             repeat: false,
-                            modifiers: shift_mods,
-                        });
-                        
-                        // Then, use Ctrl+Shift+Left for Windows/Linux word movement with selection
-                        let mut ctrl_shift_mods = Modifiers::default();
-                        ctrl_shift_mods.ctrl = true;
-                        ctrl_shift_mods.shift = true; // Add shift for selection
-                        input.events.push(Event::Key {
-                            key: Key::ArrowLeft,
-                            physical_key: Some(Key::ArrowLeft),
-                            pressed: true,
-                            repeat: false,
-                            modifiers: ctrl_shift_mods,
-                        });
-                        
-                        // Also try Alt+Shift+Left for macOS in a separate event
-                        let mut alt_shift_mods = Modifiers::default();
-                        alt_shift_mods.alt = true;
-                        alt_shift_mods.shift = true; // Add shift for selection
-                        input.events.push(Event::Key {
-                            key: Key::ArrowLeft,
-                            physical_key: Some(Key::ArrowLeft),
-                            pressed: true,
-                            repeat: false,
-                            modifiers: alt_shift_mods,
+                            modifiers: mods,
                         });
                     }
 
@@ -820,26 +814,16 @@ impl VimKeyHandler {
 
                         input.events.push(Event::Key {
                             key: Key::Home,
-                            physical_key: Some(Key::Home),
+                            physical_key: None,
                             pressed: true,
                             repeat: false,
                             modifiers: mods,
                         });
                     }
                     Key::Num4 if input.modifiers.shift => {
-                        self.debug_log(
-                            "'$' key pressed (Shift+4) in visual mode - mapping to Shift+End",
-                        );
                         events_to_remove.extend(0..input.events.len());
 
-                        // Keep shift for selection, but remove it from the $ character
-                        let mut mods = Modifiers {
-                            alt: core::default::Default::default(),
-                            ctrl: core::default::Default::default(),
-                            shift: core::default::Default::default(),
-                            mac_cmd: core::default::Default::default(),
-                            command: core::default::Default::default(),
-                        };
+                        let mut mods = input.modifiers;
                         mods.shift = true;
 
                         input.events.push(Event::Key {
@@ -854,33 +838,19 @@ impl VimKeyHandler {
                     // Document movement - translate to document navigation events with selection
                     Key::G => {
                         if input.modifiers.shift {
-                            self.debug_log(
-                                "'G' key pressed in visual mode - mapping to document-end with selection",
-                            );
                             events_to_remove.extend(0..input.events.len());
 
-                            // Generate document end navigation events with selection
                             let events = self.gen_doc_navigation_events(true, true);
-                            println!("DEBUG: Generated {} events for document-end movement with selection", events.len());
-                            
-                            // Add all generated events to the input queue
+
                             for event in events {
-                                println!("DEBUG: Adding visual mode document-end event: {:?}", event);
                                 input.events.push(event);
                             }
                         } else {
-                            self.debug_log(
-                                "'g' key pressed in visual mode - mapping to document-start with selection",
-                            );
                             events_to_remove.extend(0..input.events.len());
 
-                            // Generate document start navigation events with selection
                             let events = self.gen_doc_navigation_events(false, true);
-                            println!("DEBUG: Generated {} events for document-start movement with selection", events.len());
-                            
-                            // Add all generated events to the input queue
+
                             for event in events {
-                                println!("DEBUG: Adding visual mode document-start event: {:?}", event);
                                 input.events.push(event);
                             }
                         }

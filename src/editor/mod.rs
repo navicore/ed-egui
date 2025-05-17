@@ -261,7 +261,6 @@ impl EditorWidget {
 
     /// Intercept and process keyboard input before the UI is created
     fn process_input_before_ui(&mut self, ctx: &Context) {
-        
         // We need to manipulate the input events to handle our custom key bindings
         ctx.input_mut(|input| {
             // Enhanced debug print of all input events
@@ -356,6 +355,4 @@ impl EditorWidget {
             }
         });
     }
-    
-
 }
