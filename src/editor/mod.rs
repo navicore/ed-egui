@@ -183,8 +183,23 @@ impl EditorWidget {
     
     /// Intercept and process keyboard input before the UI is created
     fn process_input_before_ui(&mut self, ctx: &Context) {
+        // Debug print of current state
+        if matches!(self.current_mode, EditorMode::Vim(VimMode::Normal)) {
+            println!("In VIM normal mode, processing input");
+        }
+        
         // We need to manipulate the input events to prevent unwanted character insertion
         ctx.input_mut(|input| {
+            // Debug print of all input events
+            if !input.events.is_empty() {
+                println!("Input events: {:?}", input.events);
+            }
+            
+            // Debug print of input keys
+            if !input.keys_down.is_empty() {
+                println!("Keys down: {:?}, modifiers: {:?}", input.keys_down, input.modifiers);
+            }
+            
             // Track events we want to suppress (to be removed from input events)
             let mut events_to_remove = Vec::new();
             
@@ -269,9 +284,11 @@ impl EditorWidget {
                         
                         // Word movement - using Ctrl+Arrow keys for word movement
                         egui::Key::W if input.key_pressed(egui::Key::W) => {
+                            println!("'w' key pressed - mapping to Ctrl+Right and implementing WordRight");
                             // Translate 'w' to Ctrl+Right for word-by-word movement
                             events_to_remove.extend(0..input.events.len());
                             
+                            // For TextEdit to understand
                             let mut mods = input.modifiers;
                             mods.ctrl = true;
                             
@@ -282,11 +299,16 @@ impl EditorWidget {
                                 repeat: false,
                                 modifiers: mods,
                             });
+                            
+                            // Also execute directly for reliable behavior
+                            self.execute_command(EditorCommand::MoveCursor(CursorMovement::WordRight));
                         },
                         egui::Key::B if input.key_pressed(egui::Key::B) => {
+                            println!("'b' key pressed - mapping to Ctrl+Left and implementing WordLeft");
                             // Translate 'b' to Ctrl+Left for word-by-word movement
                             events_to_remove.extend(0..input.events.len());
                             
+                            // For TextEdit to understand
                             let mut mods = input.modifiers;
                             mods.ctrl = true;
                             
@@ -297,6 +319,9 @@ impl EditorWidget {
                                 repeat: false,
                                 modifiers: mods,
                             });
+                            
+                            // Also execute directly for reliable behavior
+                            self.execute_command(EditorCommand::MoveCursor(CursorMovement::WordLeft));
                         },
                         
                         // Line movement - using actual Home/End keys
@@ -312,6 +337,24 @@ impl EditorWidget {
                                 modifiers: input.modifiers,
                             });
                         },
+                        // Handle $ key directly via text events and as (shift+4)
+                        egui::Key::Num4 if input.key_pressed(egui::Key::Num4) && input.modifiers.shift => {
+                            println!("$ key pressed (shift+4) - mapping to End key");
+                            // Translate '$' to End key
+                            events_to_remove.extend(0..input.events.len());
+                            
+                            // Add a synthetic End key event
+                            input.events.push(Event::Key {
+                                key: egui::Key::End,
+                                physical_key: Some(egui::Key::End),
+                                pressed: true,
+                                repeat: false,
+                                modifiers: egui::Modifiers::default(), // Remove the shift modifier
+                            });
+                            
+                            // Also execute the command directly to ensure it works
+                            self.execute_command(EditorCommand::MoveCursor(CursorMovement::LineEnd));
+                        },
                         egui::Key::End if input.key_pressed(egui::Key::End) => {
                             // Pass through End key directly
                             // The event is already an End key, so we don't need to modify it
@@ -319,13 +362,16 @@ impl EditorWidget {
                         
                         // Document movement - translate to appropriate key combinations
                         egui::Key::G if input.key_pressed(egui::Key::G) => {
+                            println!("'g/G' key pressed - Shift modifier: {}", input.modifiers.shift);
                             events_to_remove.extend(0..input.events.len());
                             
                             if input.modifiers.shift {
                                 // 'G' (shift+g) - End of document (Ctrl+End)
                                 let mut mods = input.modifiers;
                                 mods.ctrl = true;
+                                mods.shift = false; // Remove shift to prevent selection
                                 
+                                println!("  Translating 'G' to Ctrl+End (without shift)");
                                 input.events.push(Event::Key {
                                     key: egui::Key::End,
                                     physical_key: Some(egui::Key::End),
@@ -333,11 +379,15 @@ impl EditorWidget {
                                     repeat: false,
                                     modifiers: mods,
                                 });
+                                
+                                // Also execute command directly to ensure it works
+                                self.execute_command(EditorCommand::MoveCursor(CursorMovement::DocumentEnd));
                             } else {
                                 // 'g' - Start of document (Ctrl+Home)
                                 let mut mods = input.modifiers;
                                 mods.ctrl = true;
                                 
+                                println!("  Translating 'g' to Ctrl+Home");
                                 input.events.push(Event::Key {
                                     key: egui::Key::Home,
                                     physical_key: Some(egui::Key::Home),
@@ -345,6 +395,9 @@ impl EditorWidget {
                                     repeat: false,
                                     modifiers: mods,
                                 });
+                                
+                                // Also execute command directly to ensure it works
+                                self.execute_command(EditorCommand::MoveCursor(CursorMovement::DocumentStart));
                             }
                         },
                         
@@ -367,9 +420,137 @@ impl EditorWidget {
                 }
             }
             
-            // Now handle Text events for normal mode - suppress ALL of them
+            // Handle Text events for normal mode
             if is_vim_normal {
-                // In normal mode, find all Text events and mark them for removal
+                // In normal mode, check each text event
+                let mut dollar_key_pressed = false;
+                let mut g_key_pressed = false;
+                let mut shift_g_pressed = false;
+                let mut w_key_pressed = false;
+                let mut b_key_pressed = false;
+                
+                // First pass - capture special key text events
+                for (i, event) in input.events.iter().enumerate() {
+                    match event {
+                        Event::Text(text) => {
+                            println!("Text event: '{}'", text);
+                            
+                            if text == "$" {
+                                dollar_key_pressed = true;
+                                println!("$ character detected in text");
+                            } else if text == "g" {
+                                g_key_pressed = true;
+                                println!("g character detected in text");
+                            } else if text == "G" {
+                                shift_g_pressed = true;
+                                println!("G character detected in text");
+                            } else if text == "w" {
+                                w_key_pressed = true;
+                                println!("w character detected in text");
+                            } else if text == "b" {
+                                b_key_pressed = true;
+                                println!("b character detected in text");
+                            }
+                            
+                            // Mark all text events for removal (we'll add our own key events)
+                            if !events_to_remove.contains(&i) {
+                                events_to_remove.push(i);
+                            }
+                        },
+                        _ => {}
+                    }
+                }
+                
+                // Now handle the special text characters
+                if dollar_key_pressed {
+                    println!("Converting $ to End key event");
+                    
+                    // First, push an End key event that TextEdit will understand
+                    input.events.push(Event::Key {
+                        key: egui::Key::End,
+                        physical_key: Some(egui::Key::End),
+                        pressed: true,
+                        repeat: false,
+                        modifiers: egui::Modifiers::default(),
+                    });
+                    
+                    // Also execute the command directly for reliable behavior
+                    self.execute_command(EditorCommand::MoveCursor(CursorMovement::LineEnd));
+                }
+                
+                if shift_g_pressed {
+                    println!("Converting G to Ctrl+End key event");
+                    let mut mods = egui::Modifiers::default();
+                    mods.ctrl = true;
+                    
+                    // Add synthetic key event
+                    input.events.push(Event::Key {
+                        key: egui::Key::End,
+                        physical_key: Some(egui::Key::End),
+                        pressed: true,
+                        repeat: false,
+                        modifiers: mods,
+                    });
+                    
+                    // Also execute command directly
+                    self.execute_command(EditorCommand::MoveCursor(CursorMovement::DocumentEnd));
+                }
+                
+                if g_key_pressed {
+                    println!("Converting g to Ctrl+Home key event");
+                    let mut mods = egui::Modifiers::default();
+                    mods.ctrl = true;
+                    
+                    // Add synthetic key event
+                    input.events.push(Event::Key {
+                        key: egui::Key::Home,
+                        physical_key: Some(egui::Key::Home),
+                        pressed: true,
+                        repeat: false,
+                        modifiers: mods,
+                    });
+                    
+                    // Also execute command directly
+                    self.execute_command(EditorCommand::MoveCursor(CursorMovement::DocumentStart));
+                }
+                
+                if w_key_pressed {
+                    println!("Converting w to Ctrl+Right key event");
+                    let mut mods = egui::Modifiers::default();
+                    mods.ctrl = true;
+                    
+                    // Add synthetic event for TextEdit
+                    input.events.push(Event::Key {
+                        key: egui::Key::ArrowRight,
+                        physical_key: Some(egui::Key::ArrowRight),
+                        pressed: true,
+                        repeat: false,
+                        modifiers: mods,
+                    });
+                    
+                    // Also execute the command directly
+                    self.execute_command(EditorCommand::MoveCursor(CursorMovement::WordRight));
+                }
+                
+                if b_key_pressed {
+                    println!("Converting b to Ctrl+Left key event");
+                    let mut mods = egui::Modifiers::default();
+                    mods.ctrl = true;
+                    
+                    // Add synthetic event for TextEdit
+                    input.events.push(Event::Key {
+                        key: egui::Key::ArrowLeft,
+                        physical_key: Some(egui::Key::ArrowLeft),
+                        pressed: true,
+                        repeat: false,
+                        modifiers: mods,
+                    });
+                    
+                    // Also execute the command directly
+                    self.execute_command(EditorCommand::MoveCursor(CursorMovement::WordLeft));
+                }
+                
+                // In normal mode, find any remaining Text events and mark them for removal
                 for (i, event) in input.events.iter().enumerate() {
                     match event {
                         Event::Text(_) => {
