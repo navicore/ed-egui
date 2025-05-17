@@ -1,7 +1,7 @@
 pub mod buffer;
 pub mod commands;
 
-use egui::{Color32, Context, Response, RichText, TextEdit, Ui};
+use egui::{Color32, Context, Event, Response, RichText, TextEdit, Ui};
 
 use crate::syntax::HighlightOptions;
 
@@ -21,6 +21,10 @@ pub struct EditorWidget {
     font_size: f32,
     /// Whether to show the status bar at the bottom
     show_status: bool,
+    /// Track the last inserted character position for VIM normal mode
+    last_cursor_pos: usize,
+    /// Store keyboard events that shouldn't be processed by TextEdit
+    suppressed_events: Vec<Event>,
 }
 
 impl EditorWidget {
@@ -31,6 +35,8 @@ impl EditorWidget {
             current_mode: EditorMode::Emacs, // Default to Emacs mode
             font_size: 14.0,
             show_status: true,
+            last_cursor_pos: 0,
+            suppressed_events: Vec::new(),
         }
     }
 
@@ -68,12 +74,36 @@ impl EditorWidget {
         &self.current_mode
     }
 
-    pub const fn set_mode(&mut self, mode: EditorMode) {
+    pub fn set_mode(&mut self, mode: EditorMode) {
         self.current_mode = mode;
     }
 
+    /// The key method for the editor widget - this function:
+    /// 1. Intercepts keyboard events that would normally go to the TextEdit
+    /// 2. Processes vim commands directly on the buffer
+    /// 3. Prevents unwanted characters from being inserted in normal mode
     pub fn show(&mut self, ui: &mut Ui) -> Response {
-        // Create a layouter for basic syntax highlighting
+        // 1. Capture the current cursor position before any edits
+        self.last_cursor_pos = self.buffer.cursor_position();
+        
+        // 2. Process key events BEFORE we create the TextEdit widget
+        self.process_input_before_ui(ui.ctx());
+        
+        // 3. Show mode indicator at the top of the editor
+        match self.current_mode {
+            EditorMode::Vim(VimMode::Normal) => {
+                ui.label(RichText::new("-- VIM: NORMAL MODE --").strong().monospace().color(Color32::GREEN));
+            }
+            EditorMode::Vim(VimMode::Insert) => {
+                ui.label(RichText::new("-- VIM: INSERT MODE --").strong().monospace().color(Color32::YELLOW));
+            }
+            EditorMode::Emacs => {
+                ui.label(RichText::new("-- EMACS MODE --").strong().monospace().color(Color32::LIGHT_BLUE));
+            }
+            _ => {}
+        }
+        
+        // 4. Create a layouter for basic syntax highlighting
         let font_size = self.font_size;
         let mut layouter = move |ui: &Ui, text: &str, _wrap_width: f32| {
             let mut options = HighlightOptions {
@@ -88,17 +118,40 @@ impl EditorWidget {
             let layout_job = crate::syntax::basic_highlight(text, &options);
             ui.fonts(|fonts| fonts.layout_job(layout_job))
         };
-
-        // Create the text edit widget
-        let text_edit = TextEdit::multiline(self.buffer.text_mut())
+        
+        // 5. Create the basic text edit widget
+        let mut text_edit = TextEdit::multiline(self.buffer.text_mut())
             .id_source(format!("{}_edit", self.id))
             .font(egui::TextStyle::Monospace)
             .desired_width(f32::INFINITY)
             .layouter(&mut layouter);
+            
+        // 6. Add more styling/configuration to the text edit
+        match self.current_mode {
+            EditorMode::Vim(VimMode::Normal) => {
+                text_edit = text_edit.hint_text("Normal mode: press 'i' to edit");
+            }
+            EditorMode::Vim(VimMode::Insert) => {
+                text_edit = text_edit.hint_text("Insert mode: press Escape to exit");
+            }
+            EditorMode::Emacs => {
+                text_edit = text_edit.hint_text("Emacs mode");
+            }
+            _ => {}
+        }
+        
+        // 7. Add the text edit to the UI
+        let mut response = ui.add(text_edit);
+        
+        // 8. We need to restore cursor position in VIM normal mode
+        // because the TextEdit widget might have changed it due to keyboard events
+        if matches!(self.current_mode, EditorMode::Vim(VimMode::Normal)) {
+            if self.buffer.cursor_position() != self.last_cursor_pos {
+                self.buffer.set_cursor_position(self.last_cursor_pos);
+            }
+        }
 
-        let response = ui.add(text_edit);
-
-        // Show status bar if enabled
+        // 9. Show status bar if enabled
         if self.show_status {
             ui.horizontal(|ui| {
                 // Show current mode
@@ -133,108 +186,136 @@ impl EditorWidget {
                 });
             });
         }
-
-        // Process keyboard input if we have focus
-        if response.has_focus() {
-            self.process_input(ui.ctx());
+        
+        // 10. If focus is lost but we're in VIM normal mode, try to keep focus
+        if !response.has_focus() && matches!(self.current_mode, EditorMode::Vim(VimMode::Normal)) {
+            response.request_focus();
         }
 
         response
     }
-
-    /// Process input events for the editor
-    fn process_input(&mut self, ctx: &Context) {
-        fn fun_name(i: &egui::InputState) -> egui::InputState {
-            i.clone()
-        }
-        let input = ctx.input(fun_name);
-
-        // Check for mode switches
-        if input.key_pressed(egui::Key::Escape)
-            && self.current_mode == EditorMode::Vim(VimMode::Insert)
-        {
-            self.current_mode = EditorMode::Vim(VimMode::Normal);
-        }
-
-        if self.current_mode == EditorMode::Vim(VimMode::Normal) && input.key_pressed(egui::Key::I)
-        {
-            self.current_mode = EditorMode::Vim(VimMode::Insert);
-        }
-
-        // Process keystrokes based on mode
-        match self.current_mode {
-            EditorMode::Vim(VimMode::Normal) => {
-                // Basic Vim normal mode commands
-                // Basic movement
-                if input.key_pressed(egui::Key::H) {
-                    self.execute_command(EditorCommand::MoveCursor(CursorMovement::Left));
+    
+    /// Intercept and process keyboard input before the UI is created
+    fn process_input_before_ui(&mut self, ctx: &Context) {
+        // We need to manipulate the input events to prevent unwanted character insertion
+        ctx.input_mut(|input| {
+            // Track events we want to suppress (to be removed from input events)
+            let mut events_to_remove = Vec::new();
+            
+            // First check for mode transitions
+            let is_vim_normal = matches!(self.current_mode, EditorMode::Vim(VimMode::Normal));
+            let is_vim_insert = matches!(self.current_mode, EditorMode::Vim(VimMode::Insert));
+            
+            // Process keyboard events (individual keys)
+            for key in &input.keys_down {
+                // Handle Escape to exit insert mode
+                if *key == egui::Key::Escape && is_vim_insert {
+                    self.current_mode = EditorMode::Vim(VimMode::Normal);
+                    // Mark all events for removal to avoid unwanted text modifications
+                    events_to_remove.extend(0..input.events.len());
+                    // We don't want to process further events
+                    break;
                 }
-                if input.key_pressed(egui::Key::L) {
-                    self.execute_command(EditorCommand::MoveCursor(CursorMovement::Right));
-                }
-                if input.key_pressed(egui::Key::J) {
-                    self.execute_command(EditorCommand::MoveCursor(CursorMovement::Down));
-                }
-                if input.key_pressed(egui::Key::K) {
-                    self.execute_command(EditorCommand::MoveCursor(CursorMovement::Up));
-                }
-
-                // Word movement
-                if input.key_pressed(egui::Key::W) {
-                    self.execute_command(EditorCommand::MoveCursor(CursorMovement::WordRight));
-                }
-                if input.key_pressed(egui::Key::B) {
-                    self.execute_command(EditorCommand::MoveCursor(CursorMovement::WordLeft));
-                }
-
-                // Line movement
-                if input.key_pressed(egui::Key::Num0) {
-                    self.execute_command(EditorCommand::MoveCursor(CursorMovement::LineStart));
-                }
-                if input.key_pressed(egui::Key::End)
-                    || (input.key_pressed(egui::Key::Semicolon) && input.modifiers.shift)
-                {
-                    self.execute_command(EditorCommand::MoveCursor(CursorMovement::LineEnd));
-                }
-
-                // Document movement
-                if input.key_pressed(egui::Key::G) {
-                    if input.modifiers.shift {
-                        self.execute_command(EditorCommand::MoveCursor(
-                            CursorMovement::DocumentEnd,
-                        ));
-                    } else {
-                        self.execute_command(EditorCommand::MoveCursor(
-                            CursorMovement::DocumentStart,
-                        ));
+                
+                // Handle normal mode commands
+                if is_vim_normal {
+                    match *key {
+                        // Mode transitions
+                        egui::Key::I if input.key_pressed(egui::Key::I) => {
+                            self.current_mode = EditorMode::Vim(VimMode::Insert);
+                            // Mark all events for removal to avoid the 'i' being inserted
+                            events_to_remove.extend(0..input.events.len());
+                            break;
+                        },
+                        
+                        // Movement
+                        egui::Key::H if input.key_pressed(egui::Key::H) => {
+                            self.execute_command(EditorCommand::MoveCursor(CursorMovement::Left));
+                            events_to_remove.extend(0..input.events.len());
+                        },
+                        egui::Key::J if input.key_pressed(egui::Key::J) => {
+                            self.execute_command(EditorCommand::MoveCursor(CursorMovement::Down));
+                            events_to_remove.extend(0..input.events.len());
+                        },
+                        egui::Key::K if input.key_pressed(egui::Key::K) => {
+                            self.execute_command(EditorCommand::MoveCursor(CursorMovement::Up));
+                            events_to_remove.extend(0..input.events.len());
+                        },
+                        egui::Key::L if input.key_pressed(egui::Key::L) => {
+                            self.execute_command(EditorCommand::MoveCursor(CursorMovement::Right));
+                            events_to_remove.extend(0..input.events.len());
+                        },
+                        
+                        // Word movement
+                        egui::Key::W if input.key_pressed(egui::Key::W) => {
+                            self.execute_command(EditorCommand::MoveCursor(CursorMovement::WordRight));
+                            events_to_remove.extend(0..input.events.len());
+                        },
+                        egui::Key::B if input.key_pressed(egui::Key::B) => {
+                            self.execute_command(EditorCommand::MoveCursor(CursorMovement::WordLeft));
+                            events_to_remove.extend(0..input.events.len());
+                        },
+                        
+                        // Line movement
+                        egui::Key::Num0 if input.key_pressed(egui::Key::Num0) => {
+                            self.execute_command(EditorCommand::MoveCursor(CursorMovement::LineStart));
+                            events_to_remove.extend(0..input.events.len());
+                        },
+                        egui::Key::End if input.key_pressed(egui::Key::End) => {
+                            self.execute_command(EditorCommand::MoveCursor(CursorMovement::LineEnd));
+                            events_to_remove.extend(0..input.events.len());
+                        },
+                        
+                        // Document movement
+                        egui::Key::G if input.key_pressed(egui::Key::G) => {
+                            if input.modifiers.shift {
+                                self.execute_command(EditorCommand::MoveCursor(CursorMovement::DocumentEnd));
+                            } else {
+                                self.execute_command(EditorCommand::MoveCursor(CursorMovement::DocumentStart));
+                            }
+                            events_to_remove.extend(0..input.events.len());
+                        },
+                        
+                        // Editing
+                        egui::Key::X if input.key_pressed(egui::Key::X) => {
+                            self.execute_command(EditorCommand::DeleteCharForward);
+                            events_to_remove.extend(0..input.events.len());
+                        },
+                        
+                        _ => {}
                     }
-                }
-
-                // Editing
-                if input.key_pressed(egui::Key::X) {
-                    self.execute_command(EditorCommand::DeleteCharForward);
                 }
             }
-            EditorMode::Vim(VimMode::Insert) | EditorMode::Emacs => {
-                // Handle text input
-                for event in &input.events {
-                    if let egui::Event::Text(text) = event {
-                        for c in text.chars() {
-                            self.execute_command(EditorCommand::InsertChar(c));
-                        }
+            
+            // Now handle Text events for normal mode - suppress ALL of them
+            if is_vim_normal {
+                // In normal mode, find all Text events and mark them for removal
+                for (i, event) in input.events.iter().enumerate() {
+                    match event {
+                        Event::Text(_) => {
+                            if !events_to_remove.contains(&i) {
+                                events_to_remove.push(i);
+                            }
+                        },
+                        _ => {}
                     }
                 }
-
-                // Handle special keys
-                if input.key_pressed(egui::Key::Backspace) {
-                    self.execute_command(EditorCommand::DeleteChar);
+            }
+            
+            // Remove events in reverse order to maintain correct indices
+            events_to_remove.sort_unstable();
+            events_to_remove.dedup();
+            for &index in events_to_remove.iter().rev() {
+                if index < input.events.len() {
+                    input.events.remove(index);
                 }
-                if input.key_pressed(egui::Key::Enter) {
-                    self.execute_command(EditorCommand::NewLine);
-                }
-
-                // Emacs-style movement
+            }
+            
+            // Handle Emacs key commands
+            if matches!(self.current_mode, EditorMode::Emacs) {
+                // Process CTRL key combinations for Emacs mode
                 if input.modifiers.ctrl {
+                    // Basic movement
                     if input.key_pressed(egui::Key::F) {
                         self.execute_command(EditorCommand::MoveCursor(CursorMovement::Right));
                     }
@@ -247,6 +328,8 @@ impl EditorWidget {
                     if input.key_pressed(egui::Key::N) {
                         self.execute_command(EditorCommand::MoveCursor(CursorMovement::Down));
                     }
+                    
+                    // Line movement
                     if input.key_pressed(egui::Key::A) {
                         self.execute_command(EditorCommand::MoveCursor(CursorMovement::LineStart));
                     }
@@ -254,41 +337,19 @@ impl EditorWidget {
                         self.execute_command(EditorCommand::MoveCursor(CursorMovement::LineEnd));
                     }
                 }
-
-                // Alt-based word movement in Emacs
+                
+                // Process ALT key combinations for Emacs mode
                 if input.modifiers.alt {
+                    // Word movement
                     if input.key_pressed(egui::Key::F) {
                         self.execute_command(EditorCommand::MoveCursor(CursorMovement::WordRight));
                     }
                     if input.key_pressed(egui::Key::B) {
                         self.execute_command(EditorCommand::MoveCursor(CursorMovement::WordLeft));
                     }
-                    if input.key_pressed(egui::Key::ArrowRight) {
-                        self.execute_command(EditorCommand::MoveCursor(CursorMovement::WordRight));
-                    }
-                    if input.key_pressed(egui::Key::ArrowLeft) {
-                        self.execute_command(EditorCommand::MoveCursor(CursorMovement::WordLeft));
-                    }
-                }
-
-                // Document movement
-                if input.modifiers.alt {
-                    if input.key_pressed(egui::Key::Period) && input.modifiers.shift {
-                        // M->
-                        self.execute_command(EditorCommand::MoveCursor(
-                            CursorMovement::DocumentEnd,
-                        ));
-                    }
-                    if input.key_pressed(egui::Key::Comma) && input.modifiers.shift {
-                        // M-<
-                        self.execute_command(EditorCommand::MoveCursor(
-                            CursorMovement::DocumentStart,
-                        ));
-                    }
                 }
             }
-            EditorMode::Vim(_) => {}
-        }
+        });
     }
 
     /// Execute an editor command
@@ -311,8 +372,7 @@ impl EditorWidget {
             },
             EditorCommand::NewLine => self.buffer.insert_newline(),
             EditorCommand::ChangeMode(mode) => self.current_mode = mode,
-            // Other commands not yet implemented
-            _ => {}
+            _ => {} // Other commands not yet implemented
         }
     }
 }

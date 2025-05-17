@@ -12,7 +12,7 @@ impl Default for BasicEditorApp {
             .with_status_bar(true);
 
         // Set some initial text
-        editor.set_text("# Basic Editor Demo\n\nThis is a simple editor that supports Vim and Emacs keybindings.\n\n## Vim Commands\n\n- Press `Esc` to enter Normal mode\n- Press `i` to enter Insert mode\n- In Normal mode, use `h/l` to move cursor left/right\n- Use `0/$` to move to start/end of line\n- Use `x` to delete character under cursor\n\n## Emacs Commands\n\n- Use `Ctrl+F/B` to move cursor right/left\n- Use `Ctrl+A/E` to move to start/end of line\n");
+        editor.set_text("# Basic Editor Demo\n\nThis is a simple editor that supports Vim and Emacs keybindings.\n\n## Vim Commands\n\n- Press `Esc` to enter Normal mode\n- Press `i` to enter Insert mode\n- In Normal mode, use `h/j/k/l` for cursor movement\n- Use `w/b` to move by word\n- Use `0` to move to start of line, `End` to move to end\n- Use `g` to move to document start, `G` (shift+g) to move to end\n- Use `x` to delete character under cursor\n\n## Emacs Commands\n\n- Use `Ctrl+F/B` to move cursor right/left\n- Use `Ctrl+P/N` to move cursor up/down\n- Use `Ctrl+A/E` to move to start/end of line\n- Use `Alt+F/B` for word movement\n- Use `Alt+<` / `Alt+>` for document start/end\n");
 
         Self { editor }
     }
