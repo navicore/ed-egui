@@ -46,6 +46,6 @@ fn main() -> eframe::Result<()> {
     eframe::run_native(
         "Minimal Ed-Egui Example",
         native_options,
-        Box::new(|_cc| Box::new(MinimalEditorApp::default())),
+        Box::new(|_cc| Ok(Box::new(MinimalEditorApp::default()))),
     )
 }

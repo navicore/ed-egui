@@ -75,6 +75,6 @@ fn main() -> eframe::Result<()> {
     eframe::run_native(
         "Ed-Egui Emacs Editor",
         native_options,
-        Box::new(|_cc| Box::new(EmacsEditorApp::default())),
+        Box::new(|_cc| Ok(Box::new(EmacsEditorApp::default()))),
     )
 }
