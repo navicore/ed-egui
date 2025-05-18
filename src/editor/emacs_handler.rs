@@ -129,7 +129,7 @@ impl KeyHandler for EmacsKeyHandler {
             if input.key_pressed(Key::Home) {
                 self.debug_log("Ctrl+Home pressed - document start");
                 events_to_remove.extend(0..input.events.len());
-                
+
                 // Keep the Ctrl modifier
                 input.events.push(Event::Key {
                     key: Key::Home,
@@ -142,7 +142,7 @@ impl KeyHandler for EmacsKeyHandler {
             if input.key_pressed(Key::End) {
                 self.debug_log("Ctrl+End pressed - document end");
                 events_to_remove.extend(0..input.events.len());
-                
+
                 // Keep the Ctrl modifier
                 input.events.push(Event::Key {
                     key: Key::End,
@@ -162,7 +162,8 @@ impl KeyHandler for EmacsKeyHandler {
                 events_to_remove.extend(0..input.events.len());
 
                 let mut mods = Modifiers::default();
-                mods.ctrl = true;
+                let var_name = true;
+                mods.ctrl = var_name;
 
                 input.events.push(Event::Key {
                     key: Key::ArrowRight,
@@ -177,7 +178,8 @@ impl KeyHandler for EmacsKeyHandler {
                 events_to_remove.extend(0..input.events.len());
 
                 let mut mods = Modifiers::default();
-                mods.ctrl = true;
+                let var_name = true;
+                mods.ctrl = var_name;
 
                 input.events.push(Event::Key {
                     key: Key::ArrowLeft,
@@ -194,7 +196,8 @@ impl KeyHandler for EmacsKeyHandler {
                 events_to_remove.extend(0..input.events.len());
 
                 let mut mods = Modifiers::default();
-                mods.ctrl = true;
+                let var_name = true;
+                mods.ctrl = var_name;
 
                 input.events.push(Event::Key {
                     key: Key::Home,
@@ -209,7 +212,8 @@ impl KeyHandler for EmacsKeyHandler {
                 events_to_remove.extend(0..input.events.len());
 
                 let mut mods = Modifiers::default();
-                mods.ctrl = true;
+                let var_name = true;
+                mods.ctrl = var_name;
 
                 input.events.push(Event::Key {
                     key: Key::End,
