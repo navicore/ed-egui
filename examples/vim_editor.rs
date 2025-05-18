@@ -94,6 +94,6 @@ fn main() -> eframe::Result<()> {
     eframe::run_native(
         "Ed-Egui Vim Editor",
         native_options,
-        Box::new(|_cc| Box::new(VimEditorApp::default())),
+        Box::new(|_cc| Ok(Box::new(VimEditorApp::default()))),
     )
 }
