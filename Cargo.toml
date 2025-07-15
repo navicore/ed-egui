@@ -9,7 +9,7 @@ keywords = ["egui", "editor", "gui", "vim", "emacs"]
 categories = ["gui", "text-editors"]
 
 [dependencies]
-egui = { version = "0.31", default-features = false }
+egui = { version = "0.32", default-features = false }
 eframe = { version = "0.31", optional = true }
 bevy_egui = { version = "0.34", optional = true }
 syntect = { version = "5.1", default-features = false, features = ["default-fancy"] }
